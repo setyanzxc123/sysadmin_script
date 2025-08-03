@@ -1,0 +1,91 @@
+==========================================
+PANDUAN KVM FULL CLI DI UBUNTU SERVER
+==========================================
+
+1. APA ITU KVM?
+---------------
+KVM (Kernel-based Virtual Machine) adalah teknologi virtualisasi bawaan kernel Linux. Sangat efisien dan stabil untuk server-level virtualisasi.
+
+2. INSTALASI KVM DI UBUNTU SERVER
+---------------------------------
+sudo apt update
+sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst cpu-checker
+
+Tambahkan user ke grup:
+sudo usermod -aG kvm,libvirt $USER
+
+Aktifkan layanan:
+sudo systemctl enable --now libvirtd
+
+3. CEK DUKUNGAN KVM
+-------------------
+sudo kvm-ok
+lsmod | grep kvm
+
+4. MEMBUAT VM DENGAN `virt-install`
+-----------------------------------
+Contoh install Ubuntu Server:
+
+virt-install \
+--name ubuntu-vm \
+--ram 2048 \
+--vcpus 2 \
+--disk path=/var/lib/libvirt/images/ubuntu.qcow2,size=10 \
+--os-type linux \
+--os-variant ubuntu22.04 \
+--network network=default \
+--graphics none \
+--console pty,target_type=serial \
+--cdrom /iso/ubuntu-server.iso
+
+5. MANAJEMEN VM DENGAN VIRSH
+----------------------------
+List semua VM:
+virsh list --all
+
+Start / Stop:
+virsh start nama-vm
+virsh shutdown nama-vm
+
+Destroy paksa:
+virsh destroy nama-vm
+
+Autostart:
+virsh autostart nama-vm
+
+Hapus VM:
+virsh undefine nama-vm --remove-all-storage
+
+6. MANAJEMEN STORAGE & JARINGAN
+-------------------------------
+List storage pool:
+virsh pool-list
+
+List image:
+ls /var/lib/libvirt/images/
+
+Bridged adapter (butuh konfigurasi manual):
+sudo nano /etc/netplan/01-netcfg.yaml
+
+7. SNAPSHOT (KVM)
+-----------------
+Membuat snapshot:
+virsh snapshot-create-as --domain nama-vm snapshot1 "Snapshot pertama"
+
+Restore:
+virsh snapshot-revert nama-vm snapshot1
+
+8. UNINSTALL KVM
+----------------
+sudo apt purge -y qemu-kvm libvirt-* bridge-utils virtinst cpu-checker
+sudo rm -rf /var/lib/libvirt ~/.libvirt
+
+9. TIPS
+-------
+- Gunakan file .iso untuk instalasi awal.
+- Semua VM disimpan di /var/lib/libvirt/images
+- Gunakan `virt-clone` untuk menggandakan VM
+- CLI lebih ringan dan cocok untuk server headless
+
+==========================================
+

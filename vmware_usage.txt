@@ -1,0 +1,69 @@
+==========================================
+PANDUAN VMWare Workstation Player via CLI (Ubuntu)
+==========================================
+
+1. APA ITU VMWARE PLAYER?
+-------------------------
+VMware Workstation Player adalah software virtualisasi gratis (untuk non-komersial) dari VMware. Secara default, ini GUI-based, tapi tetap bisa dikontrol lewat terminal/CLI secara terbatas.
+
+2. INSTALASI (MANUAL VIA TERMINAL)
+----------------------------------
+Unduh dari: https://www.vmware.com/go/getplayer-linux
+
+Contoh install:
+chmod +x VMware-Player-*.bundle
+sudo ./VMware-Player-*.bundle --required --eulas-agreed --console
+
+3. MENJALANKAN APLIKASI
+-----------------------
+GUI default:
+vmplayer
+
+Namun CLI tersedia lewat:
+vmrun  # tool CLI dari VMware
+
+4. MENGGUNAKAN `vmrun` (ALAT CLI)
+---------------------------------
+Lokasi: biasanya di `/usr/bin/vmrun`
+
+Contoh: menjalankan VM
+vmrun start "/home/user/vmware/Ubuntu/Ubuntu.vmx" nogui
+
+Contoh: mematikan VM
+vmrun stop "/home/user/vmware/Ubuntu/Ubuntu.vmx" soft
+
+Contoh: suspend VM
+vmrun suspend "/home/user/vmware/Ubuntu/Ubuntu.vmx"
+
+Contoh: reset VM
+vmrun reset "/home/user/vmware/Ubuntu/Ubuntu.vmx" soft
+
+Contoh: snapshot
+vmrun snapshot "/path/to/vm.vmx" snapshot_name
+vmrun revertToSnapshot "/path/to/vm.vmx" snapshot_name
+
+5. FITUR TERBATAS (TIDAK SEPERTI VIRTUALBOX/KVM)
+------------------------------------------------
+- Tidak bisa buat VM via CLI (hanya via GUI).
+- File konfigurasi VM harus dibuat dulu (.vmx).
+- vmrun bisa kelola VM yang sudah dibuat.
+
+6. LOKASI VM & FILE
+-------------------
+- Default: ~/vmware/
+- File konfigurasi VM: .vmx
+- Disk image: .vmdk
+
+7. UNINSTALL VMWARE PLAYER
+--------------------------
+sudo vmware-installer -u vmware-player
+sudo rm -rf ~/.vmware /etc/vmware /usr/lib/vmware
+
+8. TIPS
+-------
+- Jalankan `vmrun` sebagai user biasa atau sudo.
+- Pastikan VMware Tools terpasang jika ingin copy file antar host–guest.
+- vmrun tidak bisa create VM dari ISO. Gunakan GUI dulu.
+
+==========================================
+

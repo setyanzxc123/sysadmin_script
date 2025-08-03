@@ -1,0 +1,100 @@
+==========================================
+PANDUAN LENGKAP VIRTUALBOX DI UBUNTU (CLI & GUI)
+==========================================
+
+1. APA ITU VIRTUALBOX?
+----------------------
+VirtualBox adalah software virtualisasi lintas platform yang memungkinkan pengguna menjalankan sistem operasi lain di dalam sistem utama (host), seperti menjalankan Windows di Ubuntu, atau sebaliknya.
+
+2. INSTALASI DI UBUNTU (VIA TERMINAL)
+-------------------------------------
+sudo apt update
+sudo apt install -y virtualbox virtualbox-ext-pack
+
+Opsional: tambahkan user ke grup vboxusers agar bisa menggunakan USB & fitur lainnya
+sudo usermod -aG vboxusers $USER
+
+3. CEK VERSI DAN STATUS VIRTUALBOX
+----------------------------------
+Cek versi:
+vboxmanage --version
+
+Cek semua VM yang tersedia:
+vboxmanage list vms
+
+Cek VM yang sedang berjalan:
+vboxmanage list runningvms
+
+4. MEMBUAT VM BARU (VIA CLI)
+----------------------------
+Contoh membuat VM Ubuntu 22.04 CLI-only:
+vboxmanage createvm --name "ubuntu-vm" --ostype Ubuntu_64 --register
+vboxmanage modifyvm "ubuntu-vm" --memory 2048 --cpus 2 --nic1 nat
+vboxmanage createhd --filename ~/VirtualBox\ VMs/ubuntu-vm/ubuntu-vm.vdi --size 10000
+vboxmanage storagectl "ubuntu-vm" --name "SATA Controller" --add sata --controller IntelAHCI
+vboxmanage storageattach "ubuntu-vm" --storagectl "SATA Controller" --port 0 --device 0 --type hdd --medium ~/VirtualBox\ VMs/ubuntu-vm/ubuntu-vm.vdi
+vboxmanage storageattach "ubuntu-vm" --storagectl "SATA Controller" --port 1 --device 0 --type dvddrive --medium /path/to/ubuntu.iso
+
+5. MENJALANKAN VM
+-----------------
+vboxmanage startvm "ubuntu-vm" --type headless
+atau
+vboxmanage startvm "ubuntu-vm" --type gui
+
+6. MENGHENTIKAN / MEMATIKAN VM
+------------------------------
+Soft shutdown:
+vboxmanage controlvm "ubuntu-vm" acpipowerbutton
+
+Force shutdown:
+vboxmanage controlvm "ubuntu-vm" poweroff
+
+7. MENGHAPUS VM
+---------------
+vboxmanage unregistervm "ubuntu-vm" --delete
+
+8. FITUR TAMBAHAN & FUNGSI LAIN
+-------------------------------
+- Snapshots:
+  vboxmanage snapshot "ubuntu-vm" take "snapshot1"
+  vboxmanage snapshot "ubuntu-vm" restore "snapshot1"
+
+- Mengubah RAM/CPU:
+  vboxmanage modifyvm "ubuntu-vm" --memory 4096 --cpus 4
+
+- Menggunakan bridged networking:
+  vboxmanage modifyvm "ubuntu-vm" --nic1 bridged --bridgeadapter1 enp0s3
+
+- Port forwarding (SSH, HTTP):
+  vboxmanage modifyvm "ubuntu-vm" --natpf1 "ssh,tcp,,2222,,22"
+
+9. VIRTUALBOX GUI (OPSIONAL)
+----------------------------
+Jika tersedia desktop GUI, jalankan:
+virtualbox
+
+10. UNINSTALL VIRTUALBOX
+------------------------
+sudo apt remove --purge -y virtualbox* virtualbox-ext-pack
+sudo apt autoremove -y
+rm -rf ~/.config/VirtualBox ~/VirtualBox\ VMs
+
+11. FILE LOKASI PENTING
+-----------------------
+- File VDI/VM: ~/VirtualBox VMs/
+- Config: ~/.config/VirtualBox
+- Log: ~/VirtualBox VMs/<vm-name>/Logs/
+
+12. TIPS
+--------
+- Gunakan snapshot sebelum eksperimen besar.
+- Gunakan bridged adapter agar VM dapat IP dari router (seperti perangkat biasa).
+- Gunakan NAT + port forwarding jika butuh akses SSH dari host.
+- Jika USB tidak terdeteksi, pastikan user masuk ke grup vboxusers dan ext-pack terinstal.
+
+====================================================
+PENUTUP:
+Panduan ini bisa digunakan untuk manajemen VirtualBox
+secara CLI atau GUI di Ubuntu. Cocok untuk server dan desktop.
+====================================================
+

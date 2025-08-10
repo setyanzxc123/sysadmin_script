@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
+# ---- LOGGING: simpan semua output ke file log ----
+mkdir -p /root
+exec > >(tee -a /root/initialscript_proxmox.log) 2>&1
+
 set -euo pipefail
 
 # ========= util =========
-log(){ printf "\n\033[1;32m[%s]\033[0m %s\n" "$(date +%H:%M:%S)" "$*"; }
-warn(){ printf "\n\033[1;33m[WARN]\033[0m %s\n" "$*"; }
-die(){ printf "\n\033[1;31m[ERR]\033[0m %s\n" "$*"; exit 1; }
+log(){ printf "\n\033[1;32m[%s]\033[0m %s\n" "$(date '+%F %T')" "$*"; }
+warn(){ printf "\n\033[1;33m[%s][WARN]\033[0m %s\n" "$(date '+%F %T')" "$*"; }
+die(){ printf "\n\033[1;31m[%s][ERR]\033[0m %s\n" "$(date '+%F %T')" "$*"; exit 1; }
 
 prefix_to_netmask(){ # arg: CIDR prefix (e.g. 24)
   local p=$1 m=() n i
@@ -21,7 +25,6 @@ prefix_to_netmask(){ # arg: CIDR prefix (e.g. 24)
 detect_if(){ ip -4 route list default | awk '{print $5}' | head -n1; }
 detect_cidr(){ ip -4 addr show dev "$1" | awk '/inet /{print $2}' | head -n1; }
 detect_gw(){ ip -4 route list default | awk '{print $3}' | head -n1; }
-
 ensure_pkg(){ apt-get -y install "$@" >/dev/null 2>&1 || apt -y install "$@"; }
 
 [[ $EUID -eq 0 ]] || die "Jalankan sebagai root: sudo -i atau sudo bash $0"
@@ -123,8 +126,8 @@ systemctl restart pve-cluster pvedaemon pveproxy pvestatd || true
 systemctl enable  pvedaemon pveproxy pvestatd || true
 
 # ========= ringkasan =========
-echo
 log "Ringkasan:"
+echo "  Log file     : /root/initialscript_proxmox.log"
 echo "  Hostname     : $(hostname -f)  (short: $HOST_SHORT)"
 echo "  NIC / IP     : $MAIN_IF / $IP4/$PREFIX (gw: $GATE)"
 echo "  Kernel aktif : $(uname -r)  (PVE? $(uname -r | grep -q pve && echo YA || echo TIDAK))"

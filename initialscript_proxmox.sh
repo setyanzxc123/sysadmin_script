@@ -6,46 +6,32 @@ warn(){ printf "\n\033[1;33m[WARN]\033[0m %s\n" "$*"; }
 die(){ printf "\n\033[1;31m[ERR]\033[0m %s\n" "$*"; exit 1; }
 
 [[ $EUID -eq 0 ]] || die "Jalankan sebagai root (sudo -i)."
+grep -qi "bookworm" /etc/os-release || warn "Skrip ini ditulis untuk Debian 12 (Bookworm)."
 
-# -------- Helpers --------
-prefix_to_netmask(){ # $1=prefix (e.g. 24) -> 255.255.255.0
-  local p=$1; local mask=(); local i
-  for i in 1 2 3 4; do
-    local n=$(( p>=8 ? 255 : (p<=0 ? 0 : (256 - 2**(8-p)) ) ))
-    mask+=("$n"); p=$(( p-8 ))
-  done
-  printf "%s.%s.%s.%s" "${mask[@]}"
-}
+# ---------- MATIKAN REPO ENTERPRISE DULU ----------
+log "Menonaktifkan repo Proxmox enterprise (jika ada)…"
+for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list 2>/dev/null; do
+  [[ -f "$f" ]] || continue
+  sed -i -E 's|^([[:space:]]*)deb ([^#]*enterprise\.proxmox\.com[^#]*)|# \1deb \2|g' "$f" || true
+  sed -i -E 's|^([[:space:]]*)deb ([^#]*pve-enterprise[^#]*)|# \1deb \2|g' "$f" || true
+done
+# ---------------------------------------------------
 
-detect_main_if(){
-  ip -4 route list default | awk '{print $5}' | head -n1
-}
-
-detect_ip_cidr(){
-  ip -4 addr show dev "$1" | awk '/inet /{print $2}' | head -n1
-}
-
-detect_gateway(){
-  ip -4 route list default | awk '{print $3}' | head -n1
-}
-
+# Helpers
+prefix_to_netmask(){ local p=$1; local m=(); for _ in 1 2 3 4; do local n=$(( p>=8?255:(p<=0?0:(256-2**(8-p))) )); m+=($n); p=$((p-8)); done; echo "${m[0]}.${m[1]}.${m[2]}.${m[3]}"; }
+detect_if(){ ip -4 route list default | awk '{print $5}' | head -n1; }
+detect_cidr(){ ip -4 addr show dev "$1" | awk '/inet /{print $2}' | head -n1; }
+detect_gw(){ ip -4 route list default | awk '{print $3}' | head -n1; }
 ensure_pkg(){ apt-get -y install "$@" >/dev/null 2>&1 || apt -y install "$@"; }
 
-# -------- Checks --------
-if ! grep -qi "bookworm" /etc/os-release; then
-  warn "Skrip ini ditulis untuk Debian 12 (Bookworm). Lanjutkan atas risiko sendiri."
-fi
-
+# NIC/IP
 log "Deteksi NIC & IP…"
-MAIN_IF=$(detect_main_if) || true
-[[ -n "${MAIN_IF:-}" ]] || die "Tidak menemukan NIC default route."
-CIDR=$(detect_ip_cidr "$MAIN_IF") || true
-[[ -n "${CIDR:-}" ]] || die "Tidak menemukan IPv4 pada $MAIN_IF."
-IP4="${CIDR%/*}"; PREFIX="${CIDR#*/}"
-GATE=$(detect_gateway) || die "Tidak menemukan gateway."
-NETMASK=$(prefix_to_netmask "$PREFIX")
+MAIN_IF=$(detect_if); [[ -n "${MAIN_IF:-}" ]] || die "Tidak menemukan NIC default route."
+CIDR=$(detect_cidr "$MAIN_IF"); [[ -n "${CIDR:-}" ]] || die "Tidak menemukan IPv4 pada $MAIN_IF."
+IP4="${CIDR%/*}"; PREFIX="${CIDR#*/}"; NETMASK=$(prefix_to_netmask "$PREFIX"); GATE=$(detect_gw) || die "Gateway tidak ditemukan"
 DNS=$(awk '/^nameserver/{print $2; exit}' /etc/resolv.conf 2>/dev/null || true)
 
+# Hostname/FQDN
 log "Hostname & FQDN…"
 CUR_SHORT=$(hostnamectl --static)
 CUR_FQDN=$(hostname -f 2>/dev/null || echo "$CUR_SHORT")
@@ -53,34 +39,31 @@ if [[ "$CUR_FQDN" == *.* ]]; then
   HOST_FQDN="$CUR_FQDN"; HOST_SHORT="${CUR_SHORT%%.*}"
 else
   HOST_FQDN="pve.local"; HOST_SHORT="pve"
-  warn "Hostname belum FQDN. Mengatur ke $HOST_FQDN"
+  warn "Hostname belum FQDN → set ke $HOST_FQDN"
   hostnamectl set-hostname "$HOST_FQDN"
 fi
-# Tulis /etc/hosts minimal sehat
 cat >/etc/hosts <<EOF
 127.0.0.1       localhost
 $IP4            $HOST_FQDN $HOST_SHORT
 EOF
 
-log "Update sistem & alat bantu…"
+# Repo/keys & update
+log "Install alat bantu & update awal…"
 export DEBIAN_FRONTEND=noninteractive
 apt update
 apt -y full-upgrade
-ensure_pkg curl wget gnupg ca-certificates apt-transport-https systemd-sysv util-linux ifupdown2 lsb-release
+ensure_pkg curl wget gnupg ca-certificates apt-transport-https systemd-sysv util-linux ifupdown2
 
-log "Repo Proxmox (no-subscription) & kunci…"
+log "Tambahkan repo Proxmox (no-subscription) & kunci…"
 echo "deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription" \
   > /etc/apt/sources.list.d/pve-install-repo.list
 wget -qO /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg \
   https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg
 chmod +r /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
-# Matikan repo enterprise jika ada
-if [[ -f /etc/apt/sources.list.d/pve-enterprise.list ]]; then
-  sed -i 's|^deb |# deb |' /etc/apt/sources.list.d/pve-enterprise.list || true
-fi
 apt update
 
-log "Install kernel & paket Proxmox… (posfix=Local only)"
+# Install PVE
+log "Install Proxmox VE (postfix=Local only)…"
 echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
 echo "postfix postfix/mailname string ${HOST_FQDN}"       | debconf-set-selections
 apt -y install proxmox-ve postfix open-iscsi
@@ -88,7 +71,8 @@ apt -y install proxmox-ve postfix open-iscsi
 log "Hapus kernel Debian lama (opsional)…"
 apt -y remove linux-image-amd64 'linux-image-6.*-amd64' || true
 
-log "Siapkan bridge vmbr0 (IP host dipindah ke bridge)…"
+# Network bridge
+log "Konfigurasi bridge vmbr0 (IP host dipindah ke bridge)…"
 cp -a /etc/network/interfaces /etc/network/interfaces.bak.$(date +%s) 2>/dev/null || true
 cat >/etc/network/interfaces <<EOF
 auto lo
@@ -106,12 +90,9 @@ iface vmbr0 inet static
     bridge-stp off
     bridge-fd 0
 EOF
-# Tambahkan DNS jika diketahui (opsional, untuk resolver klasik)
-if [[ -n "${DNS:-}" && -f /etc/resolv.conf && ! -L /etc/resolv.conf ]]; then
-  echo "nameserver $DNS" >/etc/resolv.conf || true
-fi
 
-log "Perapihan single-node cluster…"
+# Single-node cluster tidy
+log "Perapihan cluster single-node…"
 systemctl stop pve-cluster || true
 rm -rf /etc/corosync/* 2>/dev/null || true
 umount /etc/pve 2>/dev/null || true
@@ -123,7 +104,7 @@ systemctl restart networking || true
 systemctl restart pve-cluster pvedaemon pveproxy pvestatd || true
 systemctl enable  pvedaemon pveproxy pvestatd || true
 
-# -------- Summary --------
+# Ringkasan
 echo
 log "Ringkasan:"
 echo "  Hostname     : $(hostname -f)  (short: $HOST_SHORT)"
@@ -132,5 +113,5 @@ echo "  Kernel aktif : $(uname -r)  (PVE? $(uname -r | grep -q pve && echo YA ||
 echo
 systemctl --no-pager --plain status pve-cluster pvedaemon pveproxy pvestatd | sed -n '1,40p'
 echo
-log "WebUI: https://$IP4:8006   (user: root, pass: password root Debian)"
-warn "Jika WebUI belum bisa diakses, lakukan reboot sekali:  reboot"
+log "WebUI: https://$IP4:8006  (user: root, pass: password root Debian)"
+warn "Jika WebUI belum bisa, lakukan reboot sekali:  reboot"

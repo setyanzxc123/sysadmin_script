@@ -1,0 +1,79 @@
+MATERI 14: VIRTUALBOX GUEST ADDITIONS
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami apa itu Guest Additions dan mengapa ini sangat penting.
+- Mampu menginstall Guest Additions di dalam guest Linux melalui baris perintah.
+
+KONSEP INTI
+
+DEFINISI
+VirtualBox Guest Additions adalah kumpulan perangkat lunak (terutama driver perangkat dan aplikasi sistem) yang di-install DI DALAM sistem operasi guest. Tujuannya adalah untuk meningkatkan performa dan menyediakan integrasi yang lebih erat antara host dan guest.
+
+Menginstall Guest Additions adalah langkah yang SANGAT DIANJURKAN untuk semua VM.
+
+FITUR-FITUR UTAMA YANG DIDAPAT:
+- Integrasi Pointer Mouse: Mouse Anda tidak lagi "terjebak" di dalam jendela VM.
+- Shared Clipboard: Anda bisa copy-paste teks antara host dan guest.
+- Resolusi Layar Dinamis: Resolusi di dalam guest akan otomatis menyesuaikan dengan ukuran jendela VM.
+- Shared Folders: Anda bisa membuat folder di host yang dapat diakses dari dalam guest, cara mudah untuk berbagi file.
+- Peningkatan Performa Grafis.
+
+LANGKAH-LANGKAH INSTALASI (GUEST UBUNTU/DEBIAN)
+
+Proses ini melibatkan dua tahap: persiapan di guest, dan "memasukkan CD" dari host.
+
+LANGKAH 1: PERSIAPAN DI DALAM GUEST
+Guest Additions perlu mengkompilasi modul kernel. Untuk itu, ia butuh beberapa paket development.
+
+    # (Di dalam Guest) Install paket yang diperlukan
+    sudo apt update
+    sudo apt install build-essential dkms linux-headers-$(uname -r)
+
+LANGKAH 2: MEMASANG ISO GUEST ADDITIONS
+VirtualBox menyediakan file ISO berisi installer Guest Additions. Kita akan memasangnya ke DVD drive virtual VM kita dari host.
+
+    # (Di Host) Pasang file ISO Guest Additions
+    VBoxManage storageattach "Nama VM Anda" --storagectl "SATA Controller" --port 1 --device 0 --type dvddrive --medium additions
+
+CATATAN: Kata kunci 'additions' adalah alias khusus yang otomatis menunjuk ke file VBoxGuestAdditions.iso yang sesuai dengan versi VirtualBox Anda.
+
+LANGKAH 3: INSTALASI DI DALAM GUEST
+Setelah ISO terpasang, kita perlu me-mount dan menjalankan installernya.
+
+    # (Di dalam Guest) Buat direktori mount dan mount CD-nya
+    sudo mkdir -p /mnt/cdrom
+    sudo mount /dev/cdrom /mnt/cdrom
+
+    # (Di dalam Guest) Jalankan skrip instalasi
+    sudo /mnt/cdrom/VBoxLinuxAdditions.run
+
+    # (Di dalam Guest) Setelah selesai, restart VM
+    sudo reboot
+
+Setelah restart, Guest Additions sudah aktif.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MENGUJI SHARED CLIPBOARD
+- Hipotesis: Setelah Guest Additions terinstall, clipboard antara host dan guest akan tersinkronisasi.
+- Langkah:
+  1. Pastikan Guest Additions sudah terinstall dan VM sudah di-reboot.
+  2. Dari HOST, aktifkan fitur shared clipboard:
+     `VBoxManage modifyvm "Nama VM Anda" --clipboard bidirectional`
+  3. Buka editor teks di host, ketik "Halo dari Host", lalu copy teks tersebut.
+  4. Pindah ke terminal di dalam GUEST, dan coba paste (Ctrl+Shift+V atau Klik Kanan -> Paste).
+- Observasi: Apakah teks dari host berhasil di-paste ke dalam guest?
+- Jelaskan: Selain 'bidirectional', mode apalagi yang tersedia untuk clipboard dan apa bedanya? (Jawaban: Ada 'HostToGuest' (hanya bisa copy dari host ke guest), 'GuestToHost' (hanya bisa copy dari guest ke host), dan 'Disabled'. 'Bidirectional' adalah yang paling fleksibel).
+
+EKSPERIMEN 2: MEMBUAT SHARED FOLDER
+- Hipotesis: Kita bisa membuat folder di host yang dapat diakses seperti drive jaringan di dalam guest.
+- Langkah:
+  1. Di HOST, buat folder baru, misal: `mkdir ~/FolderBersama`
+  2. Dari HOST, daftarkan folder tersebut sebagai shared folder untuk VM:
+     `VBoxManage sharedfolder add "Nama VM Anda" --name "nama_share" --hostpath "/path/lengkap/ke/FolderBersama" --automount`
+  3. Restart VM. Login ke GUEST.
+  4. Cek isi direktori `/media/`.
+- Observasi: Apakah muncul folder baru bernama `sf_nama_share` di dalam `/media/`?
+- Jelaskan: Mengapa user Anda di dalam guest mungkin tidak punya izin tulis ke folder tersebut secara default, dan bagaimana cara mengatasinya? (Jawaban: Karena folder tersebut di-mount dengan kepemilikan 'root' dan grup 'vboxsf'. Untuk memberikan izin tulis, user Anda di dalam guest harus ditambahkan ke grup 'vboxsf' dengan perintah `sudo usermod -aG vboxsf NAMA_USER_ANDA`, lalu re-login).

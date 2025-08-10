@@ -1,0 +1,100 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Manajemen Jaringan KVM (NAT vs Bridge)
+
+=== Langkah Wajib (Makro) ===
+1) Pahami dua mode jaringan utama: NAT (default) dan Bridge.
+2) Pilih mode yang paling sesuai dengan kebutuhan Anda.
+3) (Untuk mode Bridge) Konfigurasi bridge di level host.
+4) Buat VM dan hubungkan ke jaringan yang dipilih.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Setiap VM membutuhkan koneksi jaringan untuk berkomunikasi. Libvirt menyediakan beberapa cara untuk menghubungkan VM ke dunia luar, namun ada dua mode yang paling sering digunakan.
+
+Analogi Sederhana: Jaringan Kantor
+Bayangkan host Anda adalah sebuah kantor.
+- Mode NAT (Default): VM Anda seperti karyawan yang duduk di ruangan terpisah dengan jaringan internal sendiri. Ia bisa mengakses internet (menelepon keluar), tapi orang dari luar tidak bisa langsung menghubunginya. Mereka harus melalui 'resepsionis' (yaitu host Anda) yang akan meneruskan koneksi (port forwarding). Ini AMAN secara default.
+- Mode Bridge: VM Anda seperti karyawan yang mendapat meja sendiri di ruang kerja utama (LAN Anda). Ia mendapat alamat IP langsung dari router kantor, dan siapa pun di kantor bisa langsung berinteraksi dengannya. Ini MUDAH DIAKSES.
+
+---
+### Mode 1: Jaringan NAT (Network Address Translation)
+
+Ini adalah mode default yang disediakan libvirt. Saat libvirt diinstall, ia otomatis membuat sebuah jaringan virtual bernama 'default' dan sebuah bridge virtual di host bernama 'virbr0'.
+
+Karakteristik:
+- Terisolasi: VM berada di subnet sendiri (biasanya 192.168.122.0/24).
+- Akses Keluar: VM bisa mengakses internet melalui host.
+- Akses Masuk: Komputer lain di LAN TIDAK BISA mengakses VM secara langsung. Akses hanya bisa dari host itu sendiri atau melalui port forwarding.
+
+Cara Menggunakan:
+Saat membuat VM, gunakan opsi:
+--network network=default,model=virtio
+
+Verifikasi:
+- Dari host, lihat daftar jaringan: 'virsh net-list --all'
+- Dari host, lihat IP yang didapat VM di jaringan NAT: 'virsh net-dhcp-leases default'
+
+---
+### Mode 2: Jaringan Bridge
+
+Mode ini "menjembatani" kartu jaringan fisik host Anda dengan kartu jaringan virtual VM, membuat VM seolah-olah terhubung langsung ke switch jaringan utama Anda.
+
+Karakteristik:
+- Terintegrasi: VM menjadi bagian dari LAN Anda.
+- Akses Penuh: VM mendapat IP dari router utama Anda (misal: 192.168.1.x) dan bisa diakses oleh perangkat lain di LAN.
+
+Cara Menggunakan:
+Pertama, Anda harus membuat interface bridge di host (misal: 'br0'). Setelah itu, saat membuat VM, gunakan opsi:
+--network bridge=br0,model=virtio
+
+---
+### Cara Membuat Bridge dengan Netplan (Lanjutan & Berisiko)
+
+PERINGATAN: SALAH KONFIGURASI NETPLAN BISA MEMBUAT HOST ANDA KEHILANGAN KONEKSI JARINGAN. LAKUKAN INI DENGAN HATI-HATI, SEBAIKNYA MELALUI KONSOL FISIK (BUKAN SSH).
+
+# 1. Cari tahu nama interface fisik Anda saat ini.
+ip a
+# (Cari nama seperti enp3s0, ens33, eth0, dll)
+
+# 2. Buat file konfigurasi netplan baru.
+# Ganti nama file dan isinya sesuai kebutuhan.
+sudo nano /etc/netplan/01-netcfg.yaml
+
+# 3. Isi file tersebut dengan konfigurasi bridge.
+# PENTING: GANTI 'enp3s0' DENGAN NAMA INTERFACE ANDA.
+network:
+  version: 2
+  ethernets:
+    enp3s0:
+      dhcp4: no
+  bridges:
+    br0:
+      interfaces: [enp3s0]
+      dhcp4: yes
+
+# 4. Terapkan konfigurasi.
+sudo netplan apply
+
+Setelah ini, host Anda akan mendapatkan IP melalui 'br0', dan 'br0' siap digunakan oleh VM.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Membandingkan IP Address
+- Hipotesis: VM dengan jaringan Bridge akan mendapatkan IP dari subnet LAN utama, sedangkan VM NAT akan mendapatkan IP dari subnet 192.168.122.0/24.
+- Langkah:
+    # 1. Buat satu VM menggunakan '--network network=default' (NAT).
+    # 2. Buat satu VM lagi menggunakan '--network bridge=br0' (Bridge).
+    # 3. Login ke masing-masing VM dan jalankan 'ip addr'.
+- Observasi: Bandingkan alamat IP dari kedua VM. Apakah hipotesis terbukti benar?
+- Jelaskan: Selain keamanan, kapan lagi mode NAT lebih disukai daripada Bridge? (Jawaban: Saat Anda tidak ingin "mengotori" jaringan LAN utama dengan banyak alamat IP dari VM, atau saat Anda ingin membuat lab yang sepenuhnya terisolasi dari jaringan produksi).
+
+### Eksperimen 2: Memeriksa Rute Jaringan
+- Hipotesis: Rute jaringan dari dalam VM akan berbeda. VM NAT akan melalui host sebagai gateway tambahan.
+- Langkah:
+    # Login ke VM yang menggunakan NAT. Jalankan:
+    traceroute 8.8.8.8
+- Observasi: Perhatikan hop (lompatan) pertama. Apakah hop pertama adalah alamat gateway dari jaringan virtual 'virbr0' (misal: 192.168.122.1)?
+- Jelaskan: Apa implikasi dari adanya hop tambahan ini? (Jawaban: Secara teori, ini menambah sedikit sekali latensi karena ada satu proses routing tambahan di host. Namun untuk sebagian besar aplikasi, perbedaannya tidak signifikan. Implikasi utamanya lebih ke arsitektur dan isolasi jaringan itu sendiri).

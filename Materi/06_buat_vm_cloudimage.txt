@@ -1,0 +1,98 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Membuat VM dari Cloud Image
+
+=== Langkah Wajib (Makro) ===
+1) Unduh file Cloud Image dari situs resmi OS (misal: Ubuntu Cloud Images).
+2) (Opsional) Siapkan file konfigurasi 'cloud-init' untuk otomatisasi.
+3) Buat VM menggunakan 'virt-install' dengan opsi '--import'.
+4) Verifikasi VM berjalan dan sudah terkonfigurasi secara otomatis.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Ini adalah cara modern dan SANGAT CEPAT untuk membuat VM. Berbeda dengan metode ISO, kita tidak melakukan proses instalasi sama sekali.
+
+Konsepnya adalah sebagai berikut:
+1. Cloud Image: Ini adalah file hard disk virtual (misal: .qcow2) yang sudah berisi sistem operasi minimalis dan siap pakai. Anggap saja Anda mengunduh "hard disk" yang sudah terinstall OS.
+2. Cloud-Init: Ini adalah sebuah program pintar di dalam cloud image yang berjalan OTOMATIS saat VM pertama kali dinyalakan. Tugasnya adalah membaca file konfigurasi yang kita berikan untuk mengatur hal-hal seperti nama host, membuat user, dan menempatkan kunci SSH.
+
+Gunakan metode ini jika Anda ingin membuat VM server dalam hitungan detik, bukan menit. Ini adalah standar yang digunakan di lingkungan cloud dan otomatisasi.
+
+Contoh Perintah Lengkap
+Pertama, siapkan cloud image. Biasanya Anda menyalinnya ke direktori images libvirt:
+# Ganti nama file agar lebih pendek dan mudah dikelola
+cp ubuntu-22.04-server-cloudimg-amd64.img /var/lib/libvirt/images/ubuntu2204-base.qcow2
+
+Lalu, jalankan perintah 'virt-install':
+virt-install \
+--name u22-from-cloud \
+--vcpus 1 \
+--memory 1024 \
+--disk path=/var/lib/libvirt/images/ubuntu2204-base.qcow2,bus=virtio \
+--import \
+--network network=default,model=virtio \
+--os-variant ubuntu22.04 \
+--graphics none \
+--noautoconsole
+
+Membedah Perintah 'virt-install'
+Perhatikan perbedaan UTAMA dari metode ISO:
+
+1. Opsi Kunci '--import'
+- --import: INI ADALAH OPSI PALING PENTING. Opsi ini memberitahu 'virt-install' untuk TIDAK menjalankan proses instalasi, melainkan langsung menggunakan disk image yang sudah ada yang kita tentukan di '--disk'.
+
+2. Tidak Ada '--cdrom'
+- Kita tidak menggunakan '--cdrom' karena kita tidak menginstall dari file ISO.
+
+3. Makna Baru Opsi '--disk'
+- --disk path=...: Path ini sekarang menunjuk ke file cloud image yang sudah kita siapkan, bukan nama file baru yang akan dibuat.
+
+Otomatisasi dengan Cloud-Init (Opsional tapi Direkomendasikan)
+Untuk membuat prosesnya benar-benar otomatis (misalnya membuat user dan menambah kunci SSH), kita bisa menambahkan opsi '--cloud-init'.
+
+Pertama, buat file konfigurasi bernama 'user-data':
+cat > user-data <<EOF
+#cloud-config
+users:
+  - name: namauseranda
+    sudo: ALL
+    groups: [adm, sudo]
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ssh-rsa AAA... user@komputeranda
+hostname: server-keren
+EOF
+
+Lalu, tambahkan '--cloud-init' pada perintah 'virt-install':
+virt-install \
+... (opsi lainnya sama seperti di atas) ... \
+--cloud-init user-data=./user-data
+
+Sekarang, saat VM pertama kali boot, ia akan otomatis memiliki hostname 'server-keren' dan user 'namauseranda' yang bisa langsung Anda SSH menggunakan kunci Anda.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Resize Disk Cloud Image
+- Hipotesis: Meskipun cloud image dasarnya kecil (misal 2GB), kita bisa menempatkannya di volume yang lebih besar saat pembuatan VM, dan OS di dalamnya bisa diperluas untuk mengisi ruang tersebut.
+- Langkah:
+    # Buat disk baru yang lebih besar dari cloud image
+    qemu-img create -f qcow2 -F qcow2 -b ubuntu2204-base.qcow2 /var/lib/libvirt/images/u22-resized.qcow2 10G
+
+    # Buat VM menggunakan disk baru ini
+    virt-install --name u22-resized --import --disk path=/var/lib/libvirt/images/u22-resized.qcow2 ... (opsi lain)
+
+    # Login ke VM dan jalankan 'lsblk' atau 'df -h'
+- Observasi: Apakah 'df -h' di dalam guest menunjukkan ukuran root filesystem (/) masih sekitar 2GB atau sudah menjadi 10GB? (Jawaban: Biasanya masih sekitar 2GB).
+- Jelaskan: Mengapa memperbesar file disk saja tidak cukup? (Jawaban: Karena kita baru memperbesar "wadahnya" (file disk). Kita masih perlu memberitahu OS di dalamnya untuk memperluas "isinya" (partisi dan filesystem). Ini biasanya dilakukan dengan perintah seperti 'growpart' dan 'resize2fs' di dalam guest, yang seringkali dilakukan cloud-init secara otomatis jika dikonfigurasi).
+
+### Eksperimen 2: SSH via Cloud-Init
+- Hipotesis: Dengan menyediakan kunci SSH di 'user-data', kita bisa login ke VM baru tanpa password, bahkan tanpa pernah mengakses konsolnya.
+- Langkah:
+    # Buat VM menggunakan contoh '--cloud-init' di atas.
+    # Cari tahu IP Address VM tersebut (misal via 'virsh net-dhcp-leases default').
+    # Langsung coba SSH dari komputer Anda.
+    ssh namauseranda@IP_VM
+- Observasi: Apakah Anda berhasil login tanpa diminta password?
+- Jelaskan: Apa keuntungan utama menggunakan otentikasi berbasis kunci (key-based) dibandingkan password? (Jawaban: Jauh lebih aman. Kunci kriptografi sangat panjang dan kompleks, membuatnya hampir mustahil untuk ditebak (brute-force), tidak seperti password yang bisa lemah. Ini adalah standar keamanan untuk server).

@@ -1,0 +1,70 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Tambah User ke Grup Libvirt & KVM
+
+=== Langkah Wajib (Makro) ===
+1) Tambahkan user Anda saat ini ke grup 'libvirt' dan 'kvm'.
+2) Lakukan logout dan login kembali agar keanggotaan grup baru diterapkan.
+3) Verifikasi keanggotaan grup dengan perintah 'id' atau 'groups'.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Secara default, untuk menjalankan perintah manajemen VM seperti 'virsh', Anda memerlukan hak akses root (menggunakan 'sudo'). Langkah ini bertujuan untuk memberikan izin kepada user Anda agar bisa menjalankan perintah 'virsh' TANPA perlu 'sudo' setiap saat.
+
+Caranya adalah dengan menambahkan user Anda ke dua grup penting:
+- Grup 'libvirt': Memberi izin untuk mengelola VM melalui libvirt.
+- Grup 'kvm': Memberi izin untuk mengakses perangkat virtualisasi KVM (/dev/kvm).
+
+Sintaks & Penjelasan Perintah
+Untuk menambahkan user Anda saat ini, gunakan dua perintah berikut:
+
+sudo usermod -aG libvirt $(whoami)
+sudo usermod -aG kvm $(whoami)
+
+Mari kita bedah perintah ini:
+- sudo: Diperlukan karena kita memodifikasi konfigurasi user sistem.
+- usermod: Perintah untuk memodifikasi user.
+- -aG: Opsi ini sangat penting. 'a' berarti 'append' (menambahkan) dan 'G' berarti 'Groups' (grup). Ini menambahkan user ke grup baru TANPA menghapus keanggotaan grup yang sudah ada.
+- libvirt / kvm: Nama grup yang dituju.
+- $(whoami): Bagian ini akan otomatis diganti dengan username Anda yang sedang login. Ini membuatnya praktis karena Anda tidak perlu mengetik nama user Anda secara manual.
+
+PENTING: MENGAPA HARUS RE-LOGIN?
+Setelah menjalankan perintah 'usermod', perubahan tidak akan langsung aktif pada sesi terminal Anda saat ini. Sistem Linux hanya memuat keanggotaan grup seorang user pada saat ia login.
+Oleh karena itu, Anda WAJIB melakukan logout lalu login kembali. Atau, cara cepat untuk sesi terminal saat ini adalah menjalankan 'newgrp libvirt'.
+
+Langkah Verifikasi
+Setelah login kembali, jalankan perintah berikut untuk melihat semua grup Anda:
+groups
+
+Pastikan 'libvirt' dan 'kvm' ada di dalam daftar tersebut. Setelah itu, coba jalankan perintah virsh tanpa sudo:
+virsh list --all
+
+Jika perintah berjalan tanpa error "permission denied", maka konfigurasi Anda berhasil.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Akses Tanpa Sudo
+- Hipotesis: Setelah menjadi anggota grup 'libvirt', perintah 'virsh' bisa dijalankan tanpa 'sudo'.
+- Langkah:
+    # Lihat grup saat ini
+    groups
+
+    # Tambahkan user ke grup (jika belum)
+    sudo usermod -aG libvirt,kvm $(whoami)
+
+    # WAJIB: Logout lalu login kembali di terminal baru
+
+    # Jalankan perintah virsh tanpa sudo
+    virsh -c qemu:///system list
+- Observasi: Apakah perintah 'virsh' di atas berjalan tanpa error 'permission denied'?
+- Jelaskan: Apa yang terjadi pada sesi shell saat user login sehingga keanggotaan grup yang baru bisa dikenali? (Jawaban: Saat login, shell akan membaca file-file sistem seperti /etc/passwd dan /etc/group untuk membangun token akses user, yang berisi informasi UID, GID, dan semua keanggotaan grupnya).
+
+### Eksperimen 2: Izin pada Socket Libvirt
+- Hipotesis: Akses ke libvirt sebenarnya diatur oleh izin pada file socketnya.
+- Langkah:
+    # Lihat grup apa yang memiliki file socket libvirt
+    ls -l /var/run/libvirt/libvirt-sock
+- Observasi: Perhatikan outputnya, terutama pada bagian grup (kolom ke-4) dan izinnya (misal: srwxrwx---). Apakah nama grupnya 'libvirt'?
+- Jelaskan: Apa efeknya jika izin pada file socket ini salah (misalnya, grup pemiliknya bukan 'libvirt' atau izin grupnya tidak ada 'w' untuk write)? (Jawaban: User yang menjadi anggota grup 'libvirt' tetap tidak akan bisa mengelola VM karena mereka tidak memiliki izin untuk menulis/membaca file socket yang menjadi gerbang komunikasi ke daemon libvirt).

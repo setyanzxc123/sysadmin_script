@@ -1,0 +1,77 @@
+MATERI 17: PERFORMANCE TUNING & KESIMPULAN
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Mengetahui area-area utama untuk optimasi performa di VirtualBox.
+- Merangkum semua keterampilan yang telah dipelajari dalam seri ini.
+
+BAGIAN 1: PERFORMANCE TUNING (TIPS SINGKAT)
+
+FILOSOFI UTAMA: Sama seperti KVM, jangan melakukan tuning jika tidak ada masalah performa yang terukur. Alokasi RAM dan CPU yang cukup biasanya sudah menjadi 80% dari solusi. Namun, jika Anda menghadapi bottleneck, berikut adalah beberapa area yang bisa diperiksa.
+
+Semua tuning biasanya dilakukan dengan perintah `VBoxManage modifyvm`.
+
+1. ALOKASI DASAR (CPU & RAM)
+   - Pastikan VM memiliki cukup RAM dan vCPU untuk bebannya, tapi jangan berlebihan. Memberikan terlalu banyak vCPU (lebih dari core fisik yang Anda miliki) justru bisa memperlambat sistem.
+   - Perintah: `--memory <MB>` dan `--cpus <jumlah>`
+
+2. PASTIKAN HARDWARE VIRTUALIZATION AKTIF
+   Pastikan VT-x/AMD-V tidak hanya aktif di BIOS, tapi juga diaktifkan untuk VM itu sendiri.
+   - Perintah: `VBoxManage modifyvm "Nama VM Anda" --hwvirtex on`
+
+3. GUNAKAN STORAGE CONTROLLER MODERN
+   Untuk OS modern (Linux/Windows terbaru), menggunakan controller NVMe bisa memberikan performa I/O disk yang jauh lebih baik daripada SATA.
+   - Perintah (saat membuat controller): `VBoxManage storagectl "Nama VM Anda" --name "NVMe Controller" --add pcie --controller NVMe`
+
+4. AKTIFKAN HOST I/O CACHE
+   Untuk I/O yang intensif membaca (read-intensive), mengaktifkan cache di host bisa membantu.
+   - Perintah: `VBoxManage storagectl "Nama VM Anda" --name "SATA Controller" --hostiocache on`
+   - PERINGATAN: Ini mirip `cache=writeback` di KVM. Ada risiko kecil kehilangan data jika host mati mendadak. Jangan aktifkan untuk VM database penting kecuali Anda paham risikonya.
+
+BAGIAN 2: KESIMPULAN & RANGKUMAN SERI VIRTUALBOX
+
+Selamat! Anda telah menyelesaikan seluruh materi dasar untuk manajemen VirtualBox via baris perintah.
+
+Selama seri ini, Anda telah belajar:
+- Konsep dasar Hypervisor Tipe 2 (Materi 00).
+- Cara memastikan prasyarat CPU terpenuhi (Materi 01).
+- Menginstall VirtualBox dan Extension Pack (Materi 02).
+- Mengelola izin user dengan grup `vboxusers` (Materi 03).
+- Memverifikasi instalasi dengan `VBoxManage` (Materi 04).
+- Merakit VM dari file ISO langkah demi langkah (Materi 05).
+- Membuat VM secara instan dari Appliance/Disk Jadi (Materi 06).
+- Mengakses VM secara headless dengan VRDP (Materi 07).
+- Mengkonfigurasi SSH, termasuk Port Forwarding di mode NAT (Materi 08).
+- Mengelola siklus hidup VM (start, shutdown, poweroff) (Materi 09).
+- Perbedaan dan konfigurasi jaringan NAT, Bridge, dan Host-Only (Materi 10).
+- Manajemen disk virtual (create, attach, resize) (Materi 11).
+- Menggunakan snapshot sebagai "save point" (Materi 12).
+- Mengkloning VM dan pentingnya template yang bersih (Materi 13).
+- Manfaat dan cara instalasi Guest Additions (Materi 14).
+- Dasar-dasar monitoring dan troubleshooting (Materi 15).
+- Cara menghapus VM dengan aman (Materi 16).
+
+LANGKAH SELANJUTNYA
+Dengan semua pengetahuan ini, VM VirtualBox yang Anda buat sekarang sudah sepenuhnya siap untuk mengikuti "Panduan Umum: Mengonlinekan Web Server PHP" yang telah kita susun sebelumnya.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MENGUKUR EFEK STORAGE CONTROLLER
+- Hipotesis: Controller NVMe memberikan performa I/O lebih baik daripada SATA.
+- Langkah:
+  1. Buat sebuah VM tes. Pasang disknya menggunakan controller SATA default.
+  2. Di dalam guest, install alat benchmark `fio`: `sudo apt install fio`.
+  3. Jalankan benchmark tulis sederhana: `fio --name=test --ioengine=libaio --rw=write --bs=4k --size=512M --numjobs=1 --direct=1 --group_reporting`
+  4. Catat hasilnya (throughput/IOPS).
+  5. Hapus VM tersebut. Buat ulang dengan spesifikasi yang sama, tapi kali ini gunakan controller NVMe (lihat perintah di atas).
+  6. Jalankan lagi benchmark `fio` yang sama persis.
+- Observasi: Bandingkan hasil benchmark antara controller SATA dan NVMe. Apakah ada peningkatan performa?
+- Jelaskan: Selain performa, apa keuntungan lain menggunakan standar modern seperti NVMe? (Jawaban: Efisiensi CPU. Protokol NVMe dirancang untuk mengurangi overhead CPU saat melakukan I/O, sehingga CPU bisa lebih fokus mengerjakan tugas lain).
+
+EKSPERIMEN 2: REFLEKSI PRIBADI
+- Hipotesis: Dari semua perintah yang dipelajari, ada beberapa perintah inti yang paling fundamental.
+- Langkah:
+  1. Jalankan `VBoxManage` tanpa argumen untuk melihat kembali semua kemungkinan perintah.
+- Observasi: Lihat kembali daftar perintah tersebut.
+- Jelaskan: Dari semua perintah `VBoxManage` yang telah kita pelajari dalam seri ini, sebutkan TIGA perintah yang menurut Anda paling fundamental dan akan paling sering Anda gunakan. Jelaskan mengapa. (Jawaban bisa bervariasi, tapi kemungkinan besar akan mencakup `modifyvm` (karena sangat serbaguna), `startvm`/`controlvm` (untuk manajemen harian), dan `clonevm` (untuk efisiensi)).

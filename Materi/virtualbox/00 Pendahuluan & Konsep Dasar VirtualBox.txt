@@ -1,0 +1,54 @@
+MATERI 00: PENDAHULUAN & KONSEP DASAR VIRTUALBOX
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami apa itu VirtualBox dan perbedaannya dengan KVM.
+- Mengenal komponen-komponen utama VirtualBox.
+- Mengetahui kasus penggunaan umum untuk VirtualBox.
+
+KONSEP INTI
+
+DEFINISI
+VirtualBox adalah perangkat lunak virtualisasi yang berjalan sebagai aplikasi di atas sistem operasi yang sudah ada (seperti Windows, macOS, atau Linux). Karena ia berjalan "di atas" OS lain, ia disebut sebagai HYPERVISOR TIPE 2.
+
+Ini adalah perbedaan utamanya dengan KVM. KVM adalah HYPERVISOR TIPE 1, yang berarti ia terintegrasi langsung dengan kernel Linux dan menjadikan OS itu sendiri sebagai hypervisor.
+
+ANALOGI SEDERHANA: RUMAH DI DALAM GUDANG
+- Host OS (Windows/Linux Anda): Anggap ini sebagai sebuah GUDANG yang sudah berdiri kokoh.
+- VirtualBox: Ini adalah APLIKASI atau PERKAKAS yang Anda install di dalam gudang.
+- Virtual Machine (VM): Menggunakan perkakas tersebut, Anda membangun sebuah RUMAH KECIL (VM) di dalam gudang. Rumah ini sepenuhnya terisolasi dari gudang, tapi masih bergantung pada listrik dan struktur gudang untuk bisa berfungsi.
+
+KOMPONEN UTAMA VIRTUALBOX
+Anda akan berinteraksi dengan empat bagian utama dari VirtualBox:
+1. VirtualBox Manager (GUI): Ini adalah antarmuka grafis (jendela aplikasi) yang biasa digunakan untuk mengelola VM dengan klik mouse. Ini adalah cara termudah untuk memulai.
+
+2. VBoxManage (CLI): Ini adalah alat bantu baris perintah (Command-Line Interface). Semua yang bisa Anda lakukan di GUI, bisa Anda lakukan (dan otomatiskan) dengan 'VBoxManage'. Materi kita akan FOKUS pada penggunaan alat ini, karena paling mirip dengan 'virsh' di KVM.
+
+3. Extension Pack: Ini adalah paket tambahan yang diinstall di HOST untuk membuka fitur-fitur canggih seperti dukungan USB 2.0/3.0, enkripsi disk, dan VRDP (VirtualBox Remote Display Protocol).
+
+4. Guest Additions: Ini adalah kumpulan driver dan perangkat lunak yang diinstall di DALAM GUEST VM. Tujuannya adalah untuk meningkatkan performa dan integrasi, seperti resolusi layar yang dinamis, shared clipboard, dan shared folders.
+
+TUJUAN PENGGUNAAN UMUM
+- Menjalankan Windows di dalam Linux, atau sebaliknya, untuk mengakses aplikasi spesifik.
+- Membuat lingkungan pengembangan (development) yang terisolasi.
+- Melakukan pengujian perangkat lunak di lingkungan yang "bersih" dan aman (sandbox) tanpa merusak sistem utama.
+
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MEMAHAMI HYPERVISOR TIPE 2
+- Hipotesis: Karena VirtualBox adalah aplikasi biasa, prosesnya akan terlihat di System Monitor atau Task Manager.
+- Langkah:
+  1. Buka VirtualBox Manager (GUI).
+  2. Buka System Monitor (di Linux) atau Task Manager (di Windows) di komputer HOST Anda.
+- Observasi: Cari proses yang bernama 'VirtualBox' atau 'VBoxSVC'. Apakah Anda menemukannya?
+- Jelaskan: Apa yang ditunjukkan oleh fakta ini mengenai cara kerja VirtualBox dibandingkan dengan KVM (yang modulnya `kvm_intel`/`kvm_amd` menyatu dengan kernel dan tidak terlihat sebagai aplikasi biasa)? (Jawaban: Ini membuktikan bahwa VirtualBox adalah lapisan perangkat lunak yang berjalan di atas OS utama, sedangkan KVM adalah bagian dari fondasi OS itu sendiri).
+
+EKSPERIMEN 2: PENTINGNYA GUEST ADDITIONS
+- Hipotesis: Tanpa Guest Additions, pengalaman menggunakan VM terasa kaku dan terbatas.
+- Langkah:
+  1. Buat sebuah VM dengan OS desktop (misal: Ubuntu Desktop) tapi JANGAN install Guest Additions.
+  2. Coba ubah ukuran jendela VM.
+- Observasi: Apakah resolusi layar di dalam VM ikut berubah? Apakah gerakan mouse terasa sedikit 'tertinggal'?
+- Jelaskan: Apa saja tiga fitur utama yang didapat setelah menginstall Guest Additions? (Jawaban: Integrasi pointer mouse yang mulus, resolusi layar dinamis, dan kemampuan untuk membuat folder bersama (shared folders) antara host dan guest).

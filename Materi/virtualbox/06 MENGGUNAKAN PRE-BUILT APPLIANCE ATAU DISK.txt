@@ -1,0 +1,65 @@
+MATERI 06: MENGGUNAKAN PRE-BUILT APPLIANCE ATAU DISK
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Membuat VM secara instan tanpa melalui proses instalasi OS manual.
+- Memahami perbedaan antara mengimpor 'Appliance' dan menggunakan 'Disk Jadi'.
+
+KONSEP INTI
+
+DEFINISI & TUJUAN
+Daripada menginstall OS dari file ISO yang memakan waktu, kita bisa menggunakan image yang sudah jadi. Ini adalah cara yang sangat efisien untuk mendeploy VM dengan cepat. Ada dua metode utama.
+
+METODE A: MENGIMPOR APPLIANCE (.ova / .ovf)
+- Konsep: Sebuah appliance adalah "paket" lengkap. Satu file .ova berisi seluruh konfigurasi VM (RAM, CPU, jaringan) DAN hard disk virtualnya yang sudah terinstall OS. Anda tinggal mengimpornya dan langsung menyalakannya.
+- Kapan Digunakan: Saat Anda ingin cara tercepat untuk menjalankan aplikasi atau OS tertentu yang sudah dikonfigurasi sebelumnya (misalnya, appliance WordPress dari Bitnami).
+
+METODE B: MENGGUNAKAN DISK YANG SUDAH JADI (.vdi)
+- Konsep: Mirip seperti metode cloud-image di KVM. Anda mengunduh file hard disk virtual (.vdi, .vmdk, dll) yang sudah berisi OS. Kemudian, Anda membuat "kerangka" VM kosong dan memasang disk tersebut ke dalamnya.
+- Kapan Digunakan: Saat Anda ingin lebih fleksibel. Anda bisa menggunakan satu file disk dasar (misal: Ubuntu Server minimal) untuk banyak VM dengan konfigurasi hardware yang berbeda-beda.
+
+LANGKAH-LANGKAH
+
+METODE A: MENGIMPOR APPLIANCE
+1. Unduh file appliance (biasanya berekstensi .ova) dari sumber seperti Bitnami atau OSBoxes.org.
+2. Jalankan perintah impor:
+
+   VBoxManage import nama-file.ova
+
+VirtualBox akan otomatis membaca file tersebut, membuat VM, dan mendaftarkannya. Anda bisa langsung menjalankannya.
+
+METODE B: MENGGUNAKAN DISK JADI
+1. Unduh file disk virtual (misal: ubuntu-server.vdi).
+2. Buat kerangka VM kosong dan atur spesifikasinya (RAM, CPU, Jaringan) seperti pada Materi 05, Langkah 1 & 2.
+3. Buat storage controller (Materi 05, Langkah 4).
+4. Pasang (attach) file disk yang sudah Anda unduh tersebut ke VM:
+
+   VBoxManage storageattach "Nama VM Anda" --storagectl "SATA Controller" --port 0 --device 0 --type hdd --medium /path/ke/file/ubuntu-server.vdi
+
+5. Jalankan VM. Ia akan langsung boot ke layar login OS.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: INSPEKSI SEBUAH APPLIANCE
+- Hipotesis: Kita bisa melihat isi dan konfigurasi sebuah appliance sebelum benar-benar mengimpornya.
+- Langkah:
+  1. Unduh sebuah file .ova (cari yang ukurannya kecil).
+  2. Jalankan perintah import dengan opsi '--dry-run'. Opsi ini hanya akan menampilkan informasi tanpa melakukan impor.
+     `VBoxManage import nama-file.ova --dry-run`
+- Observasi: Perhatikan outputnya. Apakah Anda bisa melihat detail seperti jumlah CPU, RAM, konfigurasi network, dan nama file disk yang disarankan oleh appliance tersebut?
+- Jelaskan: Mengapa fitur '--dry-run' ini sangat berguna? (Jawaban: Untuk keamanan dan perencanaan. Anda bisa memverifikasi bahwa appliance tersebut tidak memiliki konfigurasi yang aneh atau membutuhkan resource yang berlebihan sebelum Anda menambahkannya ke sistem Anda).
+
+EKSPERIMEN 2: MEMILIH METODE YANG TEPAT (EKSPERIMEN PIKIRAN)
+- Hipotesis: Setiap metode pembuatan VM (ISO, Appliance, Disk Jadi) memiliki kelebihan dan kekurangan.
+- Langkah:
+  - Bayangkan tiga skenario berikut:
+    1. Anda perlu membuat server dengan partisi disk yang sangat spesifik dan kustom.
+    2. Atasan Anda meminta Anda untuk "segera coba aplikasi WordPress terbaru" untuk evaluasi.
+    3. Anda perlu membuat 5 VM server Ubuntu yang identik, tetapi dengan alokasi RAM yang berbeda-beda.
+- Observasi: Tidak ada.
+- Jelaskan: Untuk setiap skenario di atas, metode mana yang akan Anda pilih dan mengapa?
+  (Jawaban:
+  1. ISO, karena memberikan kontrol penuh atas proses partisi saat instalasi.
+  2. Appliance, karena ini adalah cara tercepat untuk mendapatkan lingkungan aplikasi yang sudah jadi tanpa perlu konfigurasi.
+  3. Disk Jadi, karena Anda bisa menggunakan satu file disk dasar yang sama dan memasangnya ke 5 kerangka VM yang berbeda dengan konfigurasi RAM yang bervariasi).

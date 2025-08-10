@@ -1,0 +1,103 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Snapshot & Backup VM
+
+=== Langkah Wajib (Makro) ===
+1) Pahami perbedaan fundamental antara Snapshot dan Backup.
+2) Pelajari cara membuat dan mengembalikan (revert) snapshot.
+3) Pelajari cara melakukan backup sederhana (cold backup).
+4) Uji coba proses restore sebelum mengandalkannya.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi: Snapshot vs. Backup
+Meskipun terdengar mirip, keduanya memiliki tujuan yang sangat berbeda:
+
+- SNAPSHOT:
+  Tujuan: Untuk "membekukan" keadaan VM pada satu titik waktu tertentu.
+  Analogi: Seperti 'Save Point' dalam sebuah game. Jika Anda akan melakukan sesuatu yang berisiko (misal: upgrade software), Anda ambil snapshot. Jika gagal, Anda bisa kembali (revert) ke titik sebelum upgrade dalam hitungan detik.
+  Sifat: Jangka pendek, BUKAN untuk pemulihan bencana. Bergantung pada file disk asli.
+
+- BACKUP:
+  Tujuan: Untuk membuat salinan data VM yang mandiri dan aman.
+  Analogi: Seperti membuat fotokopi lengkap dari dokumen penting dan menyimpannya di brankas terpisah. Jika dokumen asli terbakar (host rusak), Anda masih punya salinannya.
+  Sifat: Jangka panjang, untuk pemulihan bencana (Disaster Recovery). Tidak bergantung pada file aslinya.
+
+---
+### Tugas 1: Menggunakan Snapshot
+
+Snapshot hanya berfungsi jika Anda menggunakan format disk 'qcow2'.
+
+Perintah-Perintah Utama:
+- virsh snapshot-create-as NAMA_VM NAMA_SNAPSHOT "Deskripsi singkat"
+  Fungsi: Membuat snapshot baru.
+  Contoh: virsh snapshot-create-as web01 sebelum-update-wordpress "Snapshot sebelum update"
+
+- virsh snapshot-list NAMA_VM
+  Fungsi: Menampilkan semua snapshot yang ada untuk VM tersebut.
+
+- virsh snapshot-revert NAMA_VM NAMA_SNAPSHOT
+  Fungsi: Mengembalikan keadaan VM ke titik waktu saat snapshot dibuat.
+  PERINGATAN: Semua perubahan yang dibuat SETELAH snapshot diambil akan HILANG.
+
+- virsh snapshot-delete NAMA_VM NAMA_SNAPSHOT
+  Fungsi: Menghapus file snapshot untuk merapikan dan menghemat ruang.
+
+Masalah Umum:
+- Terlalu banyak snapshot akan menurunkan performa I/O disk VM, karena libvirt harus membaca data dari rantai file yang panjang. Hapus snapshot yang sudah tidak diperlukan.
+- Format disk 'raw' tidak mendukung snapshot internal seperti ini.
+
+---
+### Tugas 2: Melakukan Backup Sederhana (Cold Backup)
+
+Cold backup berarti kita mematikan VM terlebih dahulu untuk memastikan data di dalamnya konsisten (tidak sedang dalam proses tulis).
+
+Langkah-Langkah:
+# 1. Matikan VM yang akan di-backup.
+virsh shutdown web01
+
+# 2. Backup file konfigurasi XML-nya.
+# Ini penting untuk me-restore VM dengan pengaturan yang sama.
+virsh dumpxml web01 > /path/ke/backup/web01.xml
+
+# 3. Salin file disk (volume) VM.
+sudo cp /var/lib/libvirt/images/web01.qcow2 /path/ke/backup/
+
+# 4. Setelah selesai, jangan lupa nyalakan kembali VM-nya.
+virsh start web01
+
+Untuk me-restore, Anda akan menggunakan perintah 'virsh define /path/ke/backup/web01.xml' setelah menyalin kembali file disknya.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Siklus Hidup Snapshot
+- Hipotesis: Snapshot memungkinkan kita melakukan perubahan 'berisiko' dan kembali dengan cepat jika terjadi kesalahan.
+- Langkah:
+    # 1. Di dalam VM, buat sebuah file: 'sudo touch /testfile_awal.txt'
+    # 2. Dari host, ambil snapshot:
+    virsh snapshot-create-as NAMA_VM snap-awal
+    
+    # 3. Di dalam VM, buat file kedua: 'sudo touch /testfile_kedua.txt'
+    # Verifikasi kedua file ada: 'ls /'
+    
+    # 4. Dari host, kembalikan ke snapshot awal:
+    virsh snapshot-revert NAMA_VM snap-awal
+    
+    # 5. Login lagi ke VM dan cek: 'ls /'
+- Observasi: Apakah 'testfile_kedua.txt' hilang, sementara 'testfile_awal.txt' masih ada?
+- Jelaskan: Kenapa snapshot bukan pengganti backup? (Jawaban: Karena file snapshot masih bergantung pada file disk aslinya. Jika file disk asli rusak atau terhapus, snapshotnya menjadi tidak berguna. Backup adalah salinan yang sepenuhnya terpisah dan mandiri).
+
+### Eksperimen 2: Membandingkan Ukuran Backup
+- Hipotesis: Backup file qcow2 lebih efisien daripada backup disk 'raw' dengan ukuran yang sama.
+- Langkah:
+    # Buat dua volume 10G, satu qcow2, satu raw.
+    virsh vol-create-as default-pool disk1.qcow2 10G --format qcow2
+    virsh vol-create-as default-pool disk2.raw 10G --format raw
+
+    # Jangan isi data apa pun ke dalamnya.
+    # Cek ukuran file sebenarnya di host.
+    ls -lh /var/lib/libvirt/images/disk1.qcow2
+    ls -lh /var/lib/libvirt/images/disk2.raw
+- Observasi: Berapa ukuran file 'disk1.qcow2' (seharusnya sangat kecil)? Berapa ukuran file 'disk2.raw' (seharusnya tepat 10GB)?
+- Jelaskan: Fenomena ini disebut 'thin provisioning'. Mengapa ini sangat menguntungkan untuk backup? (Jawaban: Karena Anda hanya mem-backup data yang benar-benar terisi, bukan seluruh kapasitas disk. Ini menghemat ruang penyimpanan backup secara signifikan, terutama untuk disk yang sebagian besar kosong).

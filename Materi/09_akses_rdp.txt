@@ -1,0 +1,88 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Akses VM via RDP
+
+=== Langkah Wajib (Makro) ===
+1) Tentukan OS guest: Linux Desktop atau Windows.
+2) Untuk Linux, pasang 'xrdp' dan sebuah desktop environment.
+3) Untuk Windows, aktifkan fitur 'Remote Desktop'.
+4) Pastikan port RDP (3389) diizinkan di firewall guest.
+5) Hubungkan menggunakan RDP client dari komputer Anda.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+RDP (Remote Desktop Protocol) adalah protokol untuk mengakses dan mengontrol antarmuka grafis (GUI) sebuah komputer dari jarak jauh. Ini adalah metode yang Anda gunakan jika VM Anda menjalankan sistem operasi desktop (seperti Ubuntu Desktop atau Windows) dan Anda perlu berinteraksi dengan tampilannya, bukan hanya terminal.
+
+Langkah Konfigurasi
+Prosesnya berbeda tergantung pada sistem operasi di dalam VM Anda.
+
+---
+### Skenario A: Mengaktifkan RDP di Guest Linux (dengan xrdp)
+
+Untuk bisa me-remote desktop Linux, kita perlu memasang sebuah server RDP. Yang paling umum adalah 'xrdp'. Server RDP ini kemudian akan menampilkan sebuah 'Desktop Environment'. Disarankan menggunakan yang ringan seperti XFCE.
+
+# 1. (Di dalam Guest VM) Install xrdp dan XFCE
+sudo apt update
+sudo apt install -y xrdp xfce4 xfce4-goodies
+
+# 2. Beritahu xrdp untuk menggunakan sesi XFCE
+# Perintah ini membuat file konfigurasi untuk user Anda
+echo "startxfce4" > ~/.xsession
+
+# 3. Aktifkan service xrdp
+sudo systemctl enable --now xrdp
+
+# 4. (Opsional) Izinkan port RDP di firewall guest
+sudo ufw allow 3389/tcp
+
+Sekarang, guest Linux Anda siap untuk menerima koneksi RDP.
+
+---
+### Skenario B: Mengaktifkan RDP di Guest Windows
+
+Pada Windows, fitur Remote Desktop sudah ada, hanya perlu diaktifkan. Anda bisa melakukannya melalui GUI atau lebih cepat via PowerShell.
+
+# 1. (Di dalam Guest Windows) Jalankan PowerShell sebagai Administrator
+# 2. Aktifkan Remote Desktop
+Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+
+# 3. Izinkan RDP di Windows Firewall
+Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+Sekarang, guest Windows Anda siap menerima koneksi RDP.
+
+---
+### Konektivitas: Cara Terhubung
+
+Setelah RDP diaktifkan di guest, cara Anda terhubung mengikuti aturan yang sama seperti SSH (materi 08), namun menggunakan port 3389.
+
+- Klien: Gunakan aplikasi RDP client seperti 'Remmina' di Linux, atau 'Remote Desktop Connection' bawaan Windows.
+- Alamat Tujuan:
+  - Jika VM pakai Bridge: Langsung hubungkan ke IP VM.
+  - Jika VM pakai NAT:
+    - Dari host: Hubungkan ke IP internal VM (misal: 192.168.122.x).
+    - Dari komputer lain: Lakukan port forwarding port 3389 di host Anda.
+
+Masalah Umum & Solusi
+- Layar hitam saat konek ke xrdp: Pastikan file '.xsession' sudah benar dan desktop environment (xfce4) terpasang sempurna.
+- Windows tidak bisa di-remote: Pastikan firewall rule 'Remote Desktop' benar-benar aktif dan Network Profile bukan 'Public'.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Verifikasi Port xrdp
+- Hipotesis: Setelah 'xrdp' diinstall dan dijalankan di guest Linux, port 3389 akan terbuka dan 'listening'.
+- Langkah:
+    # Di dalam guest Linux yang sudah terinstall xrdp, jalankan:
+    ss -tln | grep 3389
+- Observasi: Apakah ada output yang menunjukkan bahwa port 3389 dalam keadaan LISTEN?
+- Jelaskan: Apa perbedaan mendasar antara RDP dan 'ssh -X' (X11 Forwarding) untuk menampilkan aplikasi grafis? (Jawaban: RDP mengirimkan seluruh sesi desktop (gambar bitmap), sedangkan X11 Forwarding mengirimkan 'perintah gambar' dari aplikasi individual. RDP umumnya lebih mulus untuk sesi desktop penuh, sementara X11 lebih efisien untuk menjalankan satu aplikasi tunggal).
+
+### Eksperimen 2: Risiko Port Forwarding RDP
+- Hipotesis: Membuka port 3389 langsung ke internet adalah praktik yang sangat tidak aman.
+- Langkah:
+    # Lakukan port forwarding port 3389 dari IP publik host ke IP guest.
+    # Gunakan tool online seperti Shodan untuk mencari IP yang membuka port 3389.
+- Observasi: Ada berapa banyak perangkat yang terdeteksi di seluruh dunia yang membuka port RDP? (Jawaban: Jutaan).
+- Jelaskan: Apa risiko utama membuka port 3389 ke internet? (Jawaban: Port 3389 adalah target utama serangan brute-force (mencoba kombinasi username/password berulang kali) dan eksploitasi celah keamanan RDP seperti BlueKeep. Membukanya langsung adalah 'mengundang' penyerang).

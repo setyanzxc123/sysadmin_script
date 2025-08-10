@@ -1,0 +1,61 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Uji Koneksi Libvirt
+
+=== Langkah Wajib (Makro) ===
+1) Jalankan perintah 'virsh' sederhana untuk menguji koneksi ke daemon libvirt.
+2) Pastikan perintah berjalan tanpa error 'permission denied' atau 'failed to connect'.
+3) Jika gagal, perbaiki masalah izin atau service sebelum melanjutkan.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Ini adalah langkah verifikasi akhir sebelum kita mulai membuat VM. Tujuannya adalah untuk memastikan bahwa:
+1. Service 'libvirtd' sudah berjalan dengan baik.
+2. User Anda sudah memiliki izin yang benar untuk berkomunikasi dengan service tersebut.
+
+Jika langkah ini berhasil, berarti fondasi sistem virtualisasi Anda sudah siap.
+
+Sintaks & Penjelasan Perintah
+Perintah pengujian yang paling mendasar adalah:
+virsh list --all
+
+Cara kerja perintah ini:
+- virsh: Alat bantu CLI utama kita.
+- list: Sub-perintah untuk menampilkan daftar VM.
+- --all: Opsi untuk menampilkan semua VM, termasuk yang dalam keadaan mati (shut off).
+
+Output yang Diharapkan
+Karena kita belum membuat VM apa pun, output yang sukses adalah sebuah tabel kosong, seperti ini:
+
+ Id   Name   State
+--------------------
+
+YANG TERPENTING adalah Anda TIDAK melihat pesan error seperti "failed to connect to the hypervisor" atau "Permission denied". Tabel kosong adalah tanda sukses.
+
+Masalah Umum & Solusi
+Jika Anda mendapatkan error, penyebabnya hampir pasti salah satu dari dua hal:
+1. SERVICE MATI: Service 'libvirtd' tidak berjalan. Perbaiki dengan: 'sudo systemctl enable --now libvirtd' (Lihat materi 02).
+2. IZIN SALAH: User Anda belum ditambahkan ke grup 'libvirt', atau Anda belum logout-login setelah menambahkannya. (Lihat materi 03).
+
+Tips Lanjutan
+Untuk menghindari mengetik '-c qemu:///system' berulang kali, Anda bisa mengatur environment variable. Jalankan 'export VIRSH_DEFAULT_CONNECT_URI=qemu:///system' atau letakkan di file .bashrc Anda.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Koneksi ke System
+- Hipotesis: Jika service libvirtd aktif dan izin user benar, koneksi ke 'qemu:///system' akan berhasil.
+- Langkah:
+    virsh -c qemu:///system list
+- Observasi: Apakah Anda melihat tabel kosong tanpa pesan error?
+- Jelaskan: Bagaimana cara paling cepat untuk mendeteksi bila daemon libvirtd mati? (Jawaban: Jalankan 'systemctl status libvirtd'. Ini akan langsung menampilkan status 'active (running)' atau 'inactive (dead)').
+
+### Eksperimen 2: Koneksi Gagal Sengaja
+- Hipotesis: Menggunakan URI (alamat koneksi) yang salah akan menghasilkan pesan error yang spesifik.
+- Langkah:
+    # Kita sengaja salah ketik 'system' menjadi 'sys-tem'
+    # '|| true' ditambahkan agar shell tidak berhenti karena error
+    virsh -c qemu:///sys-tem list || true
+- Observasi: Apa pesan error yang muncul? Seharusnya sesuatu seperti "invalid URI".
+- Jelaskan: Apa yang bisa kita pelajari dari pesan error tersebut tentang bagaimana libvirt bekerja? (Jawaban: Ini mengajarkan kita bahwa libvirt sangat bergantung pada sintaks URI yang benar untuk menentukan hypervisor driver ('qemu'), mode koneksi ('///' untuk lokal), dan target daemon ('system' atau 'session'). Kesalahan kecil saja pada URI akan membuat koneksi gagal).

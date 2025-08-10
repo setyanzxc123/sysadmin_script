@@ -1,0 +1,65 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Install Paket KVM & Libvirt
+
+=== Langkah Wajib (Makro) ===
+1) Perbarui daftar paket sistem.
+2) Pasang semua paket inti: qemu-kvm, libvirt, dan alat bantu CLI.
+3) Pastikan service (daemon) libvirtd berjalan secara otomatis.
+4) Verifikasi instalasi dengan mencoba koneksi ke libvirt.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Langkah ini adalah tentang memasang semua perangkat lunak yang dibutuhkan untuk mengubah host Linux Anda menjadi sebuah hypervisor. Kita akan memasang tiga komponen utama: QEMU/KVM sebagai hypervisor, libvirt sebagai lapisan manajemen (API), dan berbagai alat bantu command-line untuk berinteraksi dengannya.
+
+Sintaks & Penjelasan Perintah
+Proses instalasi terdiri dari dua perintah utama.
+
+Perintah 1: Update Indeks Paket
+sudo apt update
+
+Perintah ini akan mengunduh daftar paket terbaru dari repositori Ubuntu, memastikan kita menginstall versi yang paling mutakhir.
+
+Perintah 2: Install Paket Inti
+sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst bridge-utils
+
+Perintah ini memasang semua yang kita butuhkan. Mari kita bedah paket-paket utamanya:
+- qemu-kvm: Ini adalah paket hypervisor utama yang menggabungkan KVM dan QEMU.
+- libvirt-daemon-system: Ini adalah service atau daemon inti dari libvirt yang berjalan di latar belakang dan mengelola semua VM.
+- libvirt-clients: Berisi alat bantu untuk user, yang terpenting adalah 'virsh'.
+- virtinst: Berisi alat bantu untuk instalasi VM, yang terpenting adalah 'virt-install'.
+- bridge-utils: Alat bantu untuk mengelola jaringan bridge (opsional, tapi sangat berguna).
+
+Langkah Verifikasi
+Setelah instalasi selesai, pastikan service libvirt berjalan:
+systemctl status libvirtd
+
+Output yang diharapkan adalah "active (running)". Jika tidak aktif, jalankan:
+sudo systemctl enable --now libvirtd
+
+Masalah Umum & Solusi
+- Service inactive (mati): Jalankan perintah 'enable --now' di atas untuk mengaktifkan dan menjalankannya.
+- dpkg terkunci / 'dpkg lock': Biasanya terjadi jika ada proses instalasi lain yang berjalan. Tunggu beberapa saat atau reboot jika perlu.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Instalasi Minimal
+- Hipotesis: Sebenarnya tidak semua paket di atas wajib. Ada beberapa paket inti yang sudah cukup untuk menjalankan VM dasar.
+- Langkah:
+    sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients virtinst
+- Observasi: Apakah 'virsh' dan 'virt-install' sudah bisa digunakan dengan instalasi minimal ini? (Jawaban: Ya).
+- Jelaskan: Kenapa 'virt-install' tidak ditemukan jika paket 'virtinst' tidak dipasang? (Jawaban: Karena file 'virt-install' adalah bagian dari paket 'virtinst'. Tanpa paketnya, perintah tersebut tidak ada di sistem).
+
+### Eksperimen 2: Koneksi Session vs System
+- Hipotesis: Libvirt menyediakan dua mode koneksi utama, 'session' untuk user biasa dan 'system' untuk mode server.
+- Langkah:
+    # Koneksi ke mode system (membutuhkan hak akses admin/grup libvirt)
+    virsh -c qemu:///system list --all
+
+    # Koneksi ke mode session (tidak butuh hak akses admin)
+    virsh -c qemu:///session list --all
+- Observasi: Apakah ada perbedaan output? VM yang dibuat di mode 'system' tidak akan terlihat di mode 'session', dan sebaliknya.
+- Jelaskan: Kapan sebaiknya menggunakan mode 'system' vs 'session'?
+  (Jawaban: Gunakan 'system' untuk VM server yang harus selalu berjalan, dikelola secara terpusat. Gunakan 'session' untuk development atau pengujian sementara yang hanya perlu diakses oleh user Anda sendiri tanpa perlu hak admin).

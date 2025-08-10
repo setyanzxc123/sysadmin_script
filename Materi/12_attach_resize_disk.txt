@@ -1,0 +1,108 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Menambah (Attach) & Memperbesar (Resize) Disk
+
+=== Langkah Wajib (Makro) ===
+1) Pahami dua tugas utama: menambah disk baru, dan memperbesar disk yang sudah ada.
+2) Lakukan operasi pada level Host menggunakan 'virsh'.
+3) Lakukan operasi pada level Guest (partisi/format/resize) agar OS mengenali perubahan.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Seiring waktu, sebuah VM mungkin kehabisan ruang penyimpanan. Materi ini mengajarkan cara mengatasi masalah tersebut tanpa harus membuat ulang VM dari awal. Ada dua skenario umum:
+
+1. Menambah disk baru (misalnya, untuk memisahkan data aplikasi dari OS).
+2. Memperbesar kapasitas disk yang sudah ada.
+
+KUNCI UTAMA: Kedua operasi ini selalu melibatkan dua tahap:
+- TAHAP 1 (di HOST): Mengubah konfigurasi perangkat keras virtual.
+- TAHAP 2 (di GUEST): Memberitahu sistem operasi di dalam VM agar mengenali dan menggunakan perubahan tersebut.
+
+---
+### Tugas 1: Menambah (Attach) Disk Baru ke VM
+
+Misalkan kita ingin menambah disk baru sebesar 10GB ke VM 'web01'.
+
+TAHAP 1: Di Host (Membuat & Memasang Disk Virtual)
+# 1. Buat file disk (volume) baru terlebih dahulu.
+# Kita gunakan perintah dari materi sebelumnya.
+virsh vol-create-as default-pool disk-data-web01.qcow2 10G
+
+# 2. Pasang (attach) volume tersebut ke VM yang sedang berjalan.
+virsh attach-disk web01 /var/lib/libvirt/images/disk-data-web01.qcow2 vdb --live --persistent
+
+Penjelasan Perintah 'attach-disk':
+- web01: Nama VM target.
+- /var/lib/libvirt/images/disk-data-web01.qcow2: Path lengkap ke file disk yang akan dipasang.
+- vdb: Nama perangkat yang akan muncul di dalam guest. 'vda' biasanya adalah disk pertama, jadi kita gunakan 'vdb' untuk yang kedua, 'vdc' untuk ketiga, dst.
+- --live: Lakukan operasi ini saat VM sedang berjalan (hotplug).
+- --persistent: Simpan perubahan ini secara permanen. Jika tidak ada opsi ini, disk akan hilang setelah VM di-reboot.
+
+TAHAP 2: Di Guest (Partisi, Format, Mount)
+Setelah TAHAP 1, OS di dalam 'web01' akan melihat ada hard disk baru bernama '/dev/vdb'. Tapi disk ini masih kosong dan belum bisa digunakan. Anda harus:
+
+# 1. (Di dalam Guest) Buat partisi baru di disk /dev/vdb.
+sudo fdisk /dev/vdb
+# (Ikuti wizard fdisk: n -> p -> 1 -> enter -> enter -> w)
+
+# 2. Format partisi baru tersebut.
+sudo mkfs.ext4 /dev/vdb1
+
+# 3. Buat direktori untuk mount, lalu mount partisi tersebut.
+sudo mkdir /data-aplikasi
+sudo mount /dev/vdb1 /data-aplikasi
+
+# 4. (PENTING) Tambahkan ke /etc/fstab agar otomatis ter-mount saat boot.
+echo '/dev/vdb1 /data-aplikasi ext4 defaults 0 0' | sudo tee -a /etc/fstab
+
+---
+### Tugas 2: Memperbesar (Resize) Disk yang Sudah Ada
+
+Misalkan disk utama ('vda') VM 'web01' sebesar 20GB dan kita ingin menambahnya menjadi 30GB.
+
+TAHAP 1: Di Host (Memperbesar File & Notifikasi VM)
+# 1. Perbesar ukuran file disk (volume) di host.
+virsh vol-resize --pool default-pool disk-utama-web01.qcow2 30G
+
+# 2. Beri tahu VM yang sedang berjalan bahwa ukuran disknya telah berubah.
+virsh blockresize web01 vda --size 30G
+
+TAHAP 2: Di Guest (Memperluas Partisi & Filesystem)
+Setelah TAHAP 1, OS guest tahu bahwa perangkat /dev/vda sekarang 30GB, tapi partisi dan filesystem di dalamnya masih 20GB.
+
+# 1. (Di dalam Guest) Perluas partisinya terlebih dahulu.
+# Asumsi partisi yang ingin diperluas adalah partisi nomor 1.
+sudo growpart /dev/vda 1
+
+# 2. Setelah partisi diperluas, perluas filesystem-nya.
+sudo resize2fs /dev/vda1
+
+# 3. Verifikasi dengan 'df -h'. Ukuran seharusnya sudah bertambah.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Attach Disk
+- Hipotesis: Disk yang di-attach dengan '--live' akan langsung terdeteksi oleh guest tanpa perlu reboot.
+- Langkah:
+    virsh attach-disk NAMA_VM --source /path/ke/disk-baru.qcow2 --target vdb --live --persistent
+    # Login ke guest dan jalankan 'lsblk'.
+- Observasi: Apakah perangkat 'vdb' langsung muncul di output 'lsblk'?
+- Jelaskan: Apa beda opsi '--live' dan '--persistent'? Apa yang terjadi jika Anda hanya menggunakan '--live' tanpa '--persistent'? (Jawaban: '--live' melakukan perubahan pada VM yang sedang berjalan. '--persistent' menyimpan perubahan ke konfigurasi XML VM. Jika hanya pakai '--live', disk tambahan akan hilang setelah VM di-reboot).
+
+### Eksperimen 2: Online Resize
+- Hipotesis: 'virsh blockresize' di host adalah prasyarat agar OS guest bisa melakukan perluasan filesystem secara online.
+- Langkah:
+    # Di Host:
+    virsh blockresize NAMA_VM vda --size 15G
+    # Di Guest:
+    lsblk
+    # Seharusnya ukuran vda sudah berubah menjadi 15G
+    df -h
+    # Ukuran filesystem '/' masih yang lama
+    sudo growpart /dev/vda 1 && sudo resize2fs /dev/vda1
+    df -h
+    # Ukuran filesystem '/' seharusnya sudah bertambah
+- Observasi: Apakah 'df -h' baru menunjukkan kapasitas baru SETELAH 'growpart' dan 'resize2fs' dijalankan?
+- Jelaskan: Mengapa perlu ada dua langkah di guest ('growpart' dan 'resize2fs')? (Jawaban: Karena ada dua lapisan yang harus diurus. 'growpart' memperluas "wadah" yaitu partisi. 'resize2fs' memperluas "isi" yaitu filesystem (ext4) agar mengisi penuh wadah yang baru diperbesar tersebut).

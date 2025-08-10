@@ -1,0 +1,45 @@
+MATERI 01: CEK DUKUNGAN CPU & AKTIVASI BIOS/UEFI
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memastikan CPU komputer Anda mendukung akselerasi hardware untuk virtualisasi.
+- Mengetahui cara mengaktifkannya jika belum aktif.
+
+KONSEP INTI
+
+DEFINISI & TUJUAN
+Sama seperti KVM, VirtualBox SANGAT BERGANTUNG pada fitur akselerasi hardware dari CPU. Fitur ini dikenal sebagai Intel VT-x (untuk CPU Intel) atau AMD-V (untuk CPU AMD).
+
+Tanpa fitur ini, Anda tidak akan bisa menjalankan guest OS 64-bit, dan performa untuk OS 32-bit akan sangat lambat. Pengecekan ini adalah langkah WAJIB sebelum instalasi.
+
+CARA PENGECEKAN
+
+Opsi A: Jika Host Anda Linux
+Jalankan perintah ini di terminal host Anda:
+    egrep -c '(vmx|svm)' /proc/cpuinfo
+
+- Jika hasilnya angka LEBIH DARI 0: Selamat, CPU Anda mendukung.
+- Jika hasilnya 0: Fitur belum aktif atau tidak didukung.
+
+Opsi B: Jika Host Anda Windows
+Cara termudah adalah melalui Task Manager:
+1. Buka Task Manager (Ctrl+Shift+Esc).
+2. Pindah ke tab "Performance".
+3. Pilih "CPU".
+4. Di pojok kanan bawah, cari tulisan "Virtualization". Statusnya harus "Enabled".
+
+MASALAH UMUM & SOLUSI
+Jika fitur ini belum aktif (hasil 0 di Linux atau "Disabled" di Windows), satu-satunya solusi adalah:
+1. Restart komputer Anda.
+2. Masuk ke pengaturan BIOS/UEFI (biasanya dengan menekan F2, F10, atau Del saat startup).
+3. Cari opsi bernama "Intel Virtualization Technology", "VT-x", "AMD-V", atau "SVM Mode".
+4. Ubah statusnya menjadi "Enabled".
+5. Simpan pengaturan dan restart.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: VALIDASI DUKUNGAN
+- Hipotesis: Sistem operasi host menyediakan cara mudah untuk memverifikasi dukungan virtualisasi.
+- Langkah:
+  - Jika Anda di Linux, jal

@@ -1,0 +1,55 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Cek Dukungan Virtualisasi CPU
+
+=== Langkah Wajib (Makro) ===
+1) Periksa apakah CPU memiliki flag virtualisasi (vmx atau svm).
+2) Jika tidak ada, aktifkan fitur virtualisasi di BIOS/UEFI.
+3) Pastikan modul kernel KVM dapat dimuat dan perangkat /dev/kvm ada.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Ini adalah langkah WAJIB pertama sebelum melakukan instalasi apa pun. Tujuannya adalah untuk memastikan CPU komputer (host) Anda mendukung akselerasi hardware untuk virtualisasi, yang dikenal sebagai Intel VT-x (flag 'vmx') atau AMD-V (flag 'svm').
+
+PENTING: Tanpa dukungan ini, KVM TIDAK AKAN BISA BERJALAN dengan performa yang layak.
+
+Sintaks Umum & Penjelasan
+Perintah yang paling umum untuk mengecek ini adalah:
+
+egrep -c '(vmx|svm)' /proc/cpuinfo
+
+Cara kerja perintah ini:
+- egrep: Ini adalah varian dari grep untuk mencari teks dalam file.
+- -c: Opsi ini berarti "count" atau "hitung". Ia akan menghitung jumlah baris yang cocok.
+- '(vmx|svm)': Ini adalah pola pencarian. Tanda | berarti "ATAU", jadi perintah ini mencari baris yang mengandung kata 'vmx' ATAU 'svm'.
+- /proc/cpuinfo: Ini adalah file virtual di Linux yang berisi informasi detail tentang CPU Anda.
+
+Output yang Diharapkan
+Anda akan melihat sebuah angka.
+- Jika angka > 0 (misalnya 4, 8, 16): CPU Anda mendukung virtualisasi.
+- Jika angka = 0: Dukungan virtualisasi belum aktif atau tidak ada.
+
+Masalah Umum & Solusi
+- Hasil 0: Penyebab paling umum adalah fitur "Intel Virtualization Technology (VT-x)" atau "AMD-V" belum diaktifkan di pengaturan BIOS/UEFI. Anda perlu me-reboot komputer dan mengaktifkannya dari sana.
+- Dijalankan di dalam VM lain (Nested VM): Jika Anda mencoba ini di dalam VM, pastikan fitur "nested virtualization" sudah diaktifkan pada host utamanya.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Validasi Cepat
+- Hipotesis: Kita bisa membuat skrip sederhana untuk memberikan output yang jelas.
+- Langkah:
+    egrep -q '(vmx|svm)' /proc/cpuinfo && echo "CPU Anda Mendukung Virtualisasi" || echo "CPU Anda TIDAK Mendukung Virtualisasi (Cek BIOS)"
+
+    Catatan: Opsi -q (quiet) membuat egrep tidak menghasilkan output, hanya status sukses atau gagal.
+- Observasi: Pesan mana yang muncul di terminal Anda?
+- Jelaskan: Mengapa pengecekan ini sangat penting dilakukan di awal? (Jawaban: Untuk menghindari proses instalasi yang sia-sia jika ternyata hardware tidak mendukung dari awal).
+
+### Eksperimen 2: Memeriksa Log Kernel (dmesg)
+- Hipotesis: Kernel Linux biasanya mencatat pesan terkait KVM saat boot, terutama jika ada masalah.
+- Langkah:
+    dmesg | grep -i kvm
+
+- Observasi: Apakah ada pesan yang muncul? Pesan seperti "kvm: Nested Virtualization enabled" adalah pertanda baik. Pesan error bisa memberi petunjuk masalah.
+- Jelaskan: Jika ada pesan error dari dmesg, bagaimana Anda akan menggunakan informasi tersebut untuk troubleshooting? (Jawaban: Pesan error di log kernel seringkali sangat spesifik, misal "KVM: disabled by BIOS". Pesan ini langsung memberi tahu kita bahwa masalahnya ada di pengaturan BIOS).

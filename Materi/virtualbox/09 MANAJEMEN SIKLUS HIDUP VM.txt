@@ -1,0 +1,62 @@
+MATERI 09: MANAJEMEN SIKLUS HIDUP VM
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Menguasai perintah dasar untuk menyalakan, mematikan, dan me-restart VM.
+- Memahami perbedaan antara mematikan secara 'sopan' dan 'paksa'.
+- Mengenal konsep autostart di VirtualBox.
+
+KONSEP INTI
+
+Setelah VM dibuat, Anda perlu mengelola siklus hidupnya (menyalakan, mematikan, dll). 'VBoxManage' menyediakan beberapa sub-perintah untuk ini, terutama 'startvm' dan 'controlvm'.
+
+PERINTAH-PERINTAH UTAMA
+
+1. MENYALAKAN VM
+Seperti yang sudah kita lihat, perintahnya adalah 'startvm'.
+
+    # Menjalankan VM dengan jendela GUI
+    VBoxManage startvm "Nama VM Anda"
+
+    # Menjalankan VM di latar belakang (headless)
+    VBoxManage startvm "Nama VM Anda" --type headless
+
+2. MENGONTROL VM YANG SEDANG BERJALAN
+Untuk mematikan atau me-restart, kita menggunakan perintah 'controlvm'.
+
+- MATI SOPAN (GRACEFUL SHUTDOWN):
+  `VBoxManage controlvm "Nama VM Anda" acpipowerbutton`
+  Fungsi: Ini mensimulasikan Anda menekan tombol power sesaat pada komputer fisik. OS di dalam guest akan menerima sinyal ACPI untuk memulai proses shutdown secara normal dan aman. INI ADALAH CARA YANG DIANJURKAN.
+
+- MATI PAKSA (HARD POWER OFF):
+  `VBoxManage controlvm "Nama VM Anda" poweroff`
+  Fungsi: Ini sama seperti menahan tombol power selama 5 detik atau mencabut kabel power. VM akan mati seketika. Gunakan ini HANYA JIKA 'acpipowerbutton' tidak merespons.
+  PERINGATAN: Berisiko menyebabkan kerusakan data.
+
+- RESTART PAKSA (RESET):
+  `VBoxManage controlvm "Nama VM Anda" reset`
+  Fungsi: Mensimulasikan penekanan tombol reset pada PC. Ini adalah restart paksa, bukan yang sopan.
+
+3. KONSEP AUTOSTART (TOPIK LANJUTAN)
+Tidak seperti KVM, VirtualBox tidak memiliki perintah 'autostart' tunggal yang mudah. Untuk membuat VM menyala otomatis saat host boot, biasanya diperlukan konfigurasi di level sistem operasi host. Di Linux, ini sering dilakukan dengan membuat sebuah 'systemd service' khusus untuk setiap VM yang ingin di-autostart. Ini adalah topik yang lebih canggih di luar cakupan dasar.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: SHUTDOWN VS POWEROFF
+- Hipotesis: 'acpipowerbutton' membutuhkan waktu bagi OS untuk shutdown, sedangkan 'poweroff' instan.
+- Langkah:
+  1. Jalankan VM: `VBoxManage startvm "Nama VM Anda"`
+  2. Cek statusnya: `VBoxManage list runningvms`
+  3. Kirim sinyal shutdown sopan: `VBoxManage controlvm "Nama VM Anda" acpipowerbutton`
+  4. Segera cek lagi statusnya berulang kali. Perhatikan berapa lama waktu yang dibutuhkan hingga VM hilang dari daftar.
+  5. Ulangi langkah 1-2, tapi kali ini gunakan `VBoxManage controlvm "Nama VM Anda" poweroff`.
+- Observasi: Apakah 'poweroff' membuat VM langsung hilang dari daftar 'runningvms'?
+- Jelaskan: Selain risiko kerusakan data, mengapa shutdown secara sopan lebih baik untuk kesehatan server dalam jangka panjang? (Jawaban: Shutdown sopan memungkinkan service-service penting seperti database untuk menulis data terakhir dari cache ke disk dan menutup koneksi dengan benar, mencegah file 'lock' yang tertinggal atau proses recovery yang panjang saat startup berikutnya).
+
+EKSPERIMEN 2: MELIHAT SEMUA OPSI KONTROL
+- Hipotesis: 'controlvm' memiliki banyak sekali opsi selain sekadar mematikan VM.
+- Langkah:
+  1. Jalankan `VBoxManage controlvm` (tanpa nama VM atau argumen lain).
+- Observasi: Perhatikan daftar semua opsi yang tersedia. Anda akan melihat opsi seperti 'pause', 'resume', 'savestate', 'screenshotpng', dll.
+- Jelaskan: Berdasarkan daftar tersebut, sebutkan dua opsi lain yang menurut Anda berguna dan jelaskan fungsinya. (Contoh Jawaban: 'pause' berguna untuk menghentikan sementara VM tanpa kehilangan state RAM-nya, cocok untuk menghemat resource CPU host sesaat. 'screenshotpng' sangat berguna untuk troubleshooting atau dokumentasi, karena memungkinkan kita mengambil gambar layar VM langsung dari baris perintah).

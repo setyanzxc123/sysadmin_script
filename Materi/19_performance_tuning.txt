@@ -1,0 +1,82 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Performance Tuning KVM (Lanjutan)
+
+=== Langkah Wajib (Makro) ===
+1) Pahami filosofi tuning: "Jangan tuning jika tidak perlu".
+2) Identifikasi area masalah (CPU, Disk, Memori, atau Jaringan).
+3. Lakukan satu perubahan pada satu waktu.
+4. Ukur (benchmark) performa sebelum dan sesudah perubahan untuk memvalidasi hasilnya.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Performance tuning adalah serangkaian teknik untuk mengoptimalkan kinerja VM agar sesuai dengan beban kerja (workload) spesifik, misalnya untuk database yang butuh I/O disk cepat atau aplikasi real-time yang butuh latensi CPU rendah.
+
+FILOSOFI UTAMA: Tuning terbaik dimulai dari PENGUKURAN, bukan tebakan. Jika sistem Anda berjalan baik, jangan diubah. Lakukan tuning hanya jika Anda punya data yang menunjukkan adanya masalah performa (bottleneck).
+
+---
+### Area 1: Tuning CPU (vCPU Pinning)
+
+Masalah: Secara default, host OS bisa memindahkan proses vCPU dari satu core fisik ke core fisik lainnya. Proses ini bisa menyebabkan "jitter" (performa yang tidak konsisten) karena cache CPU menjadi tidak valid.
+
+Solusi: vCPU Pinning, yaitu mengikat sebuah vCPU ke sebuah core fisik secara spesifik.
+
+Contoh Perintah:
+# Mengikat vCPU nomor 0 dari VM 'db01' ke core fisik nomor 2
+virsh vcpupin db01 0 2
+
+# Mengikat vCPU nomor 1 dari VM 'db01' ke core fisik nomor 3
+virsh vcpupin db01 1 3
+
+Kapan Digunakan: Untuk aplikasi yang sangat sensitif terhadap latensi, seperti database high-transaction atau voice server. Untuk web server biasa, ini jarang diperlukan.
+
+---
+### Area 2: Tuning Disk I/O
+
+Masalah: Proses caching di level host dan di level guest bisa tumpang tindih (disebut 'double caching'), yang terkadang tidak efisien.
+
+Solusi: Mengubah mode cache dan mode I/O pada disk VM. Ini dilakukan dengan mengedit XML VM ('virsh edit NAMA_VM').
+
+Contoh Konfigurasi Disk di XML:
+<disk type='file' device='disk'>
+  <driver name='qemu' type='qcow2' cache='none' io='native'/>
+  ...
+</disk>
+
+Penjelasan Opsi:
+- cache='none': Memberitahu host untuk tidak melakukan caching untuk I/O disk ini. Host akan langsung menulis ke storage, dan menyerahkan urusan caching sepenuhnya ke OS guest. Ini adalah pilihan umum untuk database yang memiliki mekanisme cache sendiri yang canggih.
+- io='native': Menggunakan implementasi AIO (Asynchronous I/O) dari kernel Linux, yang bisa memberikan throughput lebih tinggi untuk antrian I/O yang panjang.
+
+---
+### Area 3 & 4: Tuning Lanjutan (Memori & Jaringan)
+
+Berikut adalah dua area tuning lain yang lebih canggih, biasanya hanya diperlukan untuk workload yang sangat spesifik dan masif.
+
+- Tuning Memori (HugePages): Linux secara default mengelola memori dalam "halaman" kecil (4KB). HugePages memungkinkan OS mengelola memori dalam halaman yang jauh lebih besar (2MB atau 1GB). Ini bisa mengurangi overhead dan meningkatkan performa untuk aplikasi yang butuh RAM sangat besar (misal: database in-memory).
+- Tuning Jaringan (Multiqueue vNIC): Untuk VM yang harus menangani traffic jaringan puluhan hingga ratusan gigabit per detik, fitur multiqueue memungkinkan beban kerja jaringan didistribusikan ke beberapa vCPU, mencegah bottleneck pada satu core saja.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Pengaruh Mode Cache Disk
+- Hipotesis: Mode cache disk yang berbeda akan menghasilkan profil performa yang berbeda pada benchmark.
+- Langkah:
+    # 1. Edit XML VM Anda: 'virsh edit NAMA_VM'
+    # 2. Cari bagian disk dan ubah driver-nya menjadi:
+    #    <driver name='qemu' type='qcow2' cache='none'/>
+    # 3. Simpan dan restart VM.
+    # 4. Di dalam VM, jalankan benchmark I/O (misal: fio). Catat hasilnya.
+    # 5. Ulangi langkah 1-4, tapi kali ini dengan cache='writeback'.
+- Observasi: Bandingkan hasil benchmark antara 'cache=none' dan 'cache=writeback'.
+- Jelaskan: Apa risiko terbesar menggunakan 'cache=writeback'? (Jawaban: Risiko kehilangan data. Pada mode 'writeback', host akan memberitahu guest bahwa data "sudah ditulis" padahal data tersebut mungkin masih ada di cache host dan belum benar-benar ditulis ke disk fisik. Jika host mati mendadak (listrik padam), data di cache tersebut akan hilang selamanya).
+
+### Eksperimen 2: Melakukan vCPU Pinning
+- Hipotesis: Pinning vCPU dapat memberikan stabilitas performa, meskipun mungkin tidak selalu meningkatkan throughput puncak.
+- Langkah:
+    # 1. Jalankan benchmark CPU di dalam VM tanpa pinning. Amati hasilnya.
+    # 2. Dari host, lakukan pinning vCPU 0 ke core fisik, misal core 2.
+    virsh vcpupin NAMA_VM 0 2
+    # 3. Jalankan lagi benchmark CPU yang sama di dalam VM.
+- Observasi: Apakah hasilnya menjadi lebih konsisten (variasi antar run lebih kecil), meskipun angka puncaknya mungkin tidak berubah banyak?
+- Jelaskan: Kapan sebaiknya kita TIDAK melakukan pinning? (Jawaban: Saat kita menjalankan banyak VM non-kritis di satu host. Lebih baik membiarkan scheduler host yang pintar untuk mendistribusikan semua vCPU ke core fisik yang tersedia secara dinamis. Pinning justru bisa mengurangi fleksibilitas dan menyebabkan satu core fisik kelebihan beban sementara yang lain menganggur).

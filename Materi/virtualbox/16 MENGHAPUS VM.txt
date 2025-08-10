@@ -1,0 +1,61 @@
+MATERI 16: MENGHAPUS VM
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Mempelajari cara menghapus VM dari daftar VirtualBox.
+- Memahami perbedaan antara 'unregister' (menyimpan file) dan 'delete' (menghapus total).
+
+KONSEP INTI
+
+Sama seperti KVM, proses menghapus VM di VirtualBox terdiri dari dua bagian: menghapus "registrasi" VM dari daftar, dan (opsional) menghapus file-file disknya. 'VBoxManage' menyediakan cara untuk melakukan keduanya.
+
+LANGKAH-LANGKAH PENGHAPUSAN
+
+LANGKAH 1: MATIKAN VM
+VM harus dalam keadaan 'powered off' sebelum bisa dihapus.
+
+    VBoxManage controlvm "Nama VM Anda" poweroff
+
+LANGKAH 2: HAPUS VM
+Anda memiliki dua pilihan di sini.
+
+PILIHAN A: HAPUS REGISTRASI SAJA (PALING AMAN)
+Perintah ini hanya akan menghapus VM dari daftar 'VBoxManage list vms'. Semua file-nya (seperti file .vdi dan .vbox) akan TETAP ADA di hard drive Anda.
+
+    VBoxManage unregistervm "Nama VM Anda"
+
+Ini berguna jika Anda ingin mendaftarkan kembali VM tersebut suatu saat nanti.
+
+PILIHAN B: HAPUS REGISTRASI DAN SEMUA FILE (BERBAHAYA)
+Perintah ini akan menghapus VM dari daftar DAN menghapus semua file yang terkait dengannya, termasuk semua hard disk virtual (.vdi) dan snapshot.
+
+    PERINGATAN: TINDAKAN INI BERSIFAT PERMANEN DAN TIDAK BISA DI-UNDO.
+
+    VBoxManage unregistervm "Nama VM Anda" --delete
+
+Gunakan opsi '--delete' hanya jika Anda 100% yakin ingin menghapus VM beserta seluruh datanya.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: UJI COBA PENGHAPUSAN AMAN
+- Hipotesis: Menjalankan 'unregistervm' tanpa '--delete' tidak akan menghapus file .vdi.
+- Langkah:
+  1. Pastikan Anda tahu lokasi folder VM Anda (biasanya '~/VirtualBox VMs/Nama VM Anda/').
+  2. Matikan VM.
+  3. Jalankan `VBoxManage unregistervm "Nama VM Anda"`.
+  4. Cek daftar VM: `VBoxManage list vms`. VM tersebut seharusnya sudah hilang.
+  5. Cek isi folder VM Anda di host: `ls -l "~/VirtualBox VMs/Nama VM Anda/"`.
+- Observasi: Apakah file '.vdi' dan '.vbox' masih ada di dalam folder tersebut?
+- Jelaskan: Dalam skenario apa menyimpan file-file ini setelah unregister bisa berguna? (Jawaban: Jika Anda ingin memindahkan VM ke komputer lain, Anda bisa menyalin seluruh folder tersebut. Atau jika Anda hanya ingin membersihkan daftar VM yang penuh tapi masih ingin menyimpan data VM untuk diakses di masa depan).
+
+EKSPERIMEN 2: MEMAHAMI DAMPAK '--delete'
+- Hipotesis: Opsi '--delete' akan membersihkan semuanya.
+- Langkah:
+  1. Buat sebuah VM tes baru yang tidak penting.
+  2. Matikan VM tes tersebut.
+  3. Jalankan `VBoxManage unregistervm "Nama VM Tes" --delete`.
+  4. Cek daftar VM: `VBoxManage list vms`.
+  5. Cek apakah folder VM-nya masih ada di host: `ls -l "~/VirtualBox VMs/"`.
+- Observasi: Apakah folder 'Nama VM Tes' beserta seluruh isinya sudah hilang dari hard drive Anda?
+- Jelaskan: Mengapa perintah ini dianggap berbahaya dan harus digunakan dengan hati-hati? (Jawaban: Karena tidak ada dialog konfirmasi "Apakah Anda yakin?". Setelah perintah dieksekusi, data akan langsung dihapus secara permanen. Kesalahan mengetik nama VM bisa berakibat fatal pada kehilangan data yang tidak diinginkan).

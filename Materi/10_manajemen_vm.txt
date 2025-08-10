@@ -1,0 +1,88 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Manajemen VM Sehari-hari
+
+=== Langkah Wajib (Makro) ===
+1) Pelajari cara menyalakan (start), mematikan (shutdown/destroy), dan me-reboot VM.
+2) Atur VM penting agar menyala otomatis saat host booting (autostart).
+3) Verifikasi status dan informasi dasar VM menggunakan 'virsh'.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Setelah VM dibuat, kita perlu tahu cara mengelolanya. Materi ini mencakup operasi dasar dan paling sering digunakan dalam siklus hidup sebuah VM: menyalakan, mematikan, dan mengatur agar ia berjalan otomatis.
+
+Perintah-Perintah Utama
+Semua perintah di bawah ini memiliki format yang sama: 'virsh <perintah> NAMA_VM'
+
+1. Menyalakan dan Mematikan VM
+
+- virsh start NAMA_VM
+  Fungsi: Menyalakan VM yang dalam keadaan 'shut off'.
+
+- virsh shutdown NAMA_VM
+  Fungsi: Mematikan VM secara 'sopan' (graceful shutdown). Perintah ini mengirim sinyal ACPI ke dalam OS guest, sama seperti Anda menekan tombol 'Shut Down' dari dalam menu OS. Ini adalah cara yang AMAN dan direkomendasikan.
+
+- virsh reboot NAMA_VM
+  Fungsi: Me-restart VM secara 'sopan'.
+
+- virsh destroy NAMA_VM
+  Fungsi: Mematikan VM secara PAKSA. Ini sama seperti Anda mencabut kabel power dari komputer fisik. Gunakan ini HANYA JIKA 'virsh shutdown' tidak merespons.
+  PERINGATAN: 'destroy' berisiko menyebabkan kerusakan data (data corruption) karena OS tidak diberi kesempatan untuk menutup file dengan benar.
+
+2. Mengatur Autostart
+
+- virsh autostart NAMA_VM
+  Fungsi: Mengatur agar VM ini otomatis menyala setiap kali komputer host selesai booting. Sangat berguna untuk VM server yang harus selalu online.
+
+- virsh autostart --disable NAMA_VM
+  Fungsi: Membatalkan pengaturan autostart.
+
+3. Memeriksa Status VM
+
+- virsh list --all
+  Fungsi: Menampilkan daftar semua VM yang ada beserta statusnya (running, shut off, dll).
+
+- virsh dominfo NAMA_VM
+  Fungsi: Menampilkan informasi detail tentang sebuah VM, seperti status, penggunaan memori, jumlah vCPU, dan apakah autostart aktif atau tidak.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Siklus Hidup VM (Start, Shutdown, Destroy)
+- Hipotesis: Perintah 'shutdown' dan 'destroy' memiliki efek yang sama pada status akhir VM (yaitu 'shut off'), namun cara kerjanya berbeda secara fundamental.
+- Langkah:
+    # 1. Nyalakan VM
+    virsh start nama_vm_anda
+
+    # 2. Pastikan berjalan
+    virsh list
+
+    # 3. Matikan secara sopan
+    virsh shutdown nama_vm_anda
+    # Tunggu beberapa saat hingga statusnya menjadi 'shut off'
+
+    # 4. Nyalakan lagi
+    virsh start nama_vm_anda
+
+    # 5. Matikan secara paksa
+    virsh destroy nama_vm_anda
+- Observasi: Apakah 'destroy' membuat status VM langsung menjadi 'shut off' dalam sekejap, sementara 'shutdown' membutuhkan beberapa detik?
+- Jelaskan: Kapan situasi yang tepat untuk menggunakan 'destroy'? (Jawaban: Saat VM 'hang' atau tidak merespons perintah 'shutdown' sama sekali, dan Anda bersedia menerima risiko kecil kerusakan data demi membuat VM tersebut mati).
+
+### Eksperimen 2: Menguji Autostart
+- Hipotesis: Setelah diatur, status 'autostart' akan tercatat di konfigurasi VM.
+- Langkah:
+    # 1. Aktifkan autostart
+    virsh autostart nama_vm_anda
+
+    # 2. Verifikasi dengan dominfo
+    virsh dominfo nama_vm_anda | grep Autostart
+
+    # 3. Nonaktifkan lagi
+    virsh autostart --disable nama_vm_anda
+
+    # 4. Verifikasi kembali
+    virsh dominfo nama_vm_anda | grep Autostart
+- Observasi: Apakah output dari 'dominfo' berubah dari 'enabled' menjadi 'disabled' sesuai perintah yang dijalankan?
+- Jelaskan: Untuk jenis VM apa fitur autostart ini sebaiknya TIDAK diaktifkan? (Jawaban: Untuk VM yang bersifat sementara, seperti lab pengujian atau VM untuk development, yang tidak perlu selalu berjalan dan menghabiskan resource setiap kali host menyala).

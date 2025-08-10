@@ -1,0 +1,90 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Live Migration VM
+
+=== Langkah Wajib (Makro) ===
+1) Pahami konsep dan tujuan live migration.
+2) PASTIKAN SEMUA PRASYARAT terpenuhi (ini adalah bagian terpenting).
+3) Gunakan 'virsh migrate' untuk memindahkan VM.
+4) Verifikasi bahwa VM sudah berjalan di host tujuan.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Live Migration adalah proses memindahkan sebuah Virtual Machine yang sedang BERJALAN dari satu komputer host fisik ke host fisik lainnya, dengan downtime yang sangat minimal (biasanya hanya beberapa detik kehilangan ping).
+
+Tujuannya adalah untuk:
+- Melakukan maintenance (perbaikan/upgrade) pada host tanpa harus mematikan VM-VM penting di dalamnya.
+- Menyeimbangkan beban kerja (load balancing) dengan memindahkan VM dari host yang sibuk ke host yang lebih lengang.
+
+Analogi Sederhana: Memindahkan Koki yang Sedang Memasak
+Bayangkan seorang koki (VM) sedang memasak di sebuah dapur (Host A). Live migration adalah proses memindahkan koki tersebut ke Dapur B di seberang jalan, LENGKAP DENGAN kompor, wajan, dan semua bahan-bahannya, tanpa menghentikan proses memasaknya. Saat tiba di Dapur B, ia langsung lanjut memasak seolah tidak terjadi apa-apa.
+
+---
+### PRASYARAT WAJIB
+
+INI ADALAH BAGIAN PALING KRITIS. Jika prasyarat ini tidak terpenuhi, live migration PASTI GAGAL.
+
+1. Shared Storage (Penyimpanan Bersama)
+   Ini yang paling penting. Kedua host (sumber dan tujuan) harus bisa mengakses file disk VM yang SAMA di lokasi path yang SAMA PERSIS. Biasanya ini dicapai dengan menggunakan storage terpusat seperti NFS (Network File System) atau iSCSI.
+   Analogi: Kedua dapur harus menggunakan gudang bahan makanan yang sama.
+
+2. Jaringan yang Sama
+   Kedua host harus berada di jaringan yang sama agar VM tidak kehilangan konektivitas setelah pindah. Menggunakan jaringan Bridge di kedua host adalah praktik umum.
+
+3. Kepercayaan SSH Antar Host
+   Host tujuan harus bisa me-login ke host sumber via SSH (dan sebaliknya) sebagai user 'root' tanpa password (menggunakan otentikasi kunci). Libvirt menggunakan SSH untuk mentransfer data migrasi.
+
+4. CPU yang Kompatibel
+   Model CPU di kedua host tidak harus identik, tapi harus kompatibel (misalnya, sama-sama Intel atau sama-sama AMD dari generasi yang tidak terlalu jauh). Untuk kompatibilitas maksimal, VM harus dikonfigurasi dengan model CPU dasar.
+
+5. Versi QEMU/Libvirt yang Sama atau Kompatibel
+   Versi perangkat lunak virtualisasi di kedua host sebaiknya sama.
+
+---
+### Perintah Live Migration
+
+Jika semua prasyarat sudah terpenuhi, perintahnya sendiri cukup sederhana.
+
+Sintaks Perintah:
+virsh migrate --live NAMA_VM URI_HOST_TUJUAN --persistent
+
+Penjelasan Perintah:
+- --live: Menandakan bahwa ini adalah live migration.
+- NAMA_VM: Nama VM yang akan dipindahkan.
+- URI_HOST_TUJUAN: Alamat host tujuan dalam format URI libvirt.
+- --persistent: Setelah migrasi berhasil, hapus definisi VM dari host sumber dan simpan di host tujuan.
+
+Contoh:
+# Memindahkan VM 'db01' ke host 'kvm-host-02'
+virsh migrate --live db01 qemu+ssh://kvm-host-02/system --persistent
+
+Verifikasi
+Setelah perintah selesai, login ke host tujuan ('kvm-host-02') dan jalankan:
+virsh list
+
+Anda seharusnya melihat VM 'db01' sekarang berjalan di sana.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Mengamati Proses Migrasi
+- Hipotesis: Selama live migration, konektivitas ke VM hanya akan terputus sesaat.
+- Langkah:
+    # 1. Di terminal ketiga, jalankan ping terus-menerus ke IP address VM Anda.
+    ping IP_ADDRESS_VM
+
+    # 2. Di terminal host sumber, jalankan perintah migrasi.
+    virsh migrate --live NAMA_VM qemu+ssh://HOST_TUJUAN/system
+
+    # 3. Amati output ping selama proses migrasi.
+- Observasi: Apakah ping sempat 'Request timed out' selama beberapa saat, lalu kembali normal?
+- Jelaskan: Kenapa 'shared storage' sangat krusial untuk migrasi yang cepat? (Jawaban: Karena dengan shared storage, yang perlu dipindahkan hanyalah isi dari RAM VM. Jika tidak pakai shared storage, libvirt harus menyalin seluruh file disk yang bisa berukuran puluhan atau ratusan GB melalui jaringan, yang akan memakan waktu sangat lama dan bukan lagi 'live' migration).
+
+### Eksperimen 2: Kompatibilitas CPU
+- Hipotesis: Migrasi akan gagal jika CPU host tujuan tidak memiliki fitur yang dimiliki CPU host sumber.
+- Langkah:
+    # Di kedua host, jalankan perintah ini untuk melihat model CPU yang "dilihat" oleh libvirt.
+    virsh capabilities | grep -A5 '<model>'
+- Observasi: Bandingkan model CPU antara kedua host.
+- Jelaskan: Kapan sebaiknya kita mendefinisikan VM dengan CPU model dasar (seperti 'qemu64' atau 'Haswell-noTSX') daripada menggunakan '--cpu host-passthrough'? (Jawaban: Saat kita tahu bahwa cluster KVM kita terdiri dari host-host dengan model CPU yang sedikit berbeda. Menggunakan model CPU dasar memastikan VM tersebut bisa di-live-migrate ke host mana pun di dalam cluster yang mendukung setidaknya fitur dari model dasar tersebut, sehingga VM menjadi lebih portabel).

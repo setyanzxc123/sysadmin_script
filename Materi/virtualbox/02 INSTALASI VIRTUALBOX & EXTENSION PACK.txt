@@ -1,0 +1,62 @@
+MATERI 02: INSTALASI VIRTUALBOX & EXTENSION PACK
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Menginstall aplikasi utama VirtualBox di host Linux.
+- Menginstall VirtualBox Extension Pack untuk fungsionalitas tambahan.
+
+KONSEP INTI
+
+DUA KOMPONEN INSTALASI
+Instalasi VirtualBox terdiri dari dua bagian yang harus dipasang secara terpisah:
+
+1. Aplikasi Utama VirtualBox:
+   Ini adalah program inti (hypervisor) yang memungkinkan Anda membuat dan menjalankan VM.
+
+2. VirtualBox Extension Pack:
+   Ini adalah paket tambahan (add-on) dari Oracle yang menyediakan fitur-fitur penting, seperti:
+   - Dukungan untuk perangkat USB 2.0 dan 3.0.
+   - Enkripsi disk virtual.
+   - VRDP (VirtualBox Remote Display Protocol) untuk remote desktop.
+   
+   PENTING: Extension Pack memiliki lisensi yang berbeda (PUEL - Personal Use and Evaluation License) dari aplikasi utamanya (GPL). Inilah sebabnya mengapa ia harus diunduh dan diinstall secara terpisah.
+
+LANGKAH-LANGKAH INSTALASI (UNTUK HOST UBUNTU/DEBIAN)
+
+LANGKAH 1: INSTALASI APLIKASI UTAMA
+Buka terminal di host Linux Anda dan jalankan perintah berikut:
+
+    sudo apt update
+    sudo apt install virtualbox virtualbox-dkms
+
+Penjelasan Paket:
+- virtualbox: Paket aplikasi utama.
+- virtualbox-dkms: Ini adalah paket yang SANGAT PENTING. DKMS (Dynamic Kernel Module Support) akan secara otomatis mengkompilasi ulang modul kernel VirtualBox setiap kali Anda meng-update kernel Linux di host Anda. Tanpa ini, VirtualBox bisa berhenti bekerja setelah update kernel.
+
+LANGKAH 2: INSTALASI EXTENSION PACK
+Ini adalah proses manual karena Extension Pack tidak ada di repositori apt.
+
+1. Cek Versi VirtualBox Anda:
+   VBoxManage --version
+   Catat nomor versinya, misalnya '7.0.10'.
+
+2. Unduh Extension Pack yang Sesuai:
+   Buka browser dan cari "VirtualBox downloads". Kunjungi situs resmi Oracle VirtualBox dan unduh file Extension Pack yang versinya SAMA PERSIS dengan versi VirtualBox Anda. File-nya akan berekstensi '.vbox-extpack'.
+
+3. Install Extension Pack via CLI:
+   Buka terminal di folder tempat Anda mengunduh file tersebut, lalu jalankan:
+
+   sudo VBoxManage extpack install Nama-File-Extension-Pack.vbox-extpack
+
+   Anda akan diminta untuk menyetujui perjanjian lisensi. Baca dan setujui untuk melanjutkan instalasi.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: VERIFIKASI INSTALASI
+- Hipotesis: Setelah instalasi, perintah 'VBoxManage' akan tersedia dan paketnya akan terdaftar di sistem.
+- Langkah:
+  1. Jalankan `VBoxManage --version` di terminal.
+  2. Jalankan `dpkg -l | grep virtualbox` untuk melihat semua paket terkait VirtualBox yang terpasang.
+- Observasi: Apakah perintah pertama berhasil menampilkan nomor versi? Apakah perintah kedua menampilkan setidaknya 'virtualbox' dan 'virtualbox-dkms' dalam daftar?
+- Jelaskan: Mengapa penting untuk memastikan 'virtualbox-dkms' juga terpas

@@ -1,0 +1,82 @@
+MATERI 08: AKSES VM VIA SSH
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Mengaktifkan SSH server di dalam guest VM.
+- Memahami cara terhubung ke VM melalui SSH dalam mode jaringan Bridge dan NAT.
+- Menggunakan fitur Port Forwarding bawaan VirtualBox untuk mode NAT.
+
+KONSEP INTI
+
+SSH (Secure Shell) adalah protokol standar industri untuk mengelola server Linux dari jarak jauh melalui baris perintah. Setelah SSH aktif, Anda hampir tidak perlu lagi menggunakan VRDP atau konsol GUI untuk tugas-tugas administrasi. Prosesnya 99% sama seperti mengelola server fisik.
+
+LANGKAH 1: KONFIGURASI DI DALAM GUEST VM
+Langkah ini dilakukan DI DALAM VM, bukan di host.
+
+# 1. Update dan install SSH server
+    sudo apt update
+    sudo apt install -y openssh-server
+
+# 2. Pastikan service-nya berjalan
+    systemctl status ssh
+    # Jika tidak aktif, jalankan: 'sudo systemctl enable --now ssh'
+
+LANGKAH 2: CARA TERHUBUNG VIA SSH
+
+Metode koneksi bergantung pada mode jaringan yang Anda pilih untuk VM.
+
+SKENARIO A: VM MENGGUNAKAN JARINGAN BRIDGE
+Ini adalah cara termudah. VM Anda akan mendapatkan alamat IP di jaringan lokal Anda (misal: 192.168.1.x), seolah-olah ia adalah komputer fisik.
+
+1. Temukan IP VM: Di dalam VM, jalankan `ip addr`.
+2. Hubungkan: Dari komputer host atau komputer lain di jaringan yang sama, jalankan:
+   `ssh namauser@IP_VM_DARI_BRIDGE`
+
+SKENARIO B: VM MENGGUNAKAN JARINGAN NAT (DEFAULT)
+Dalam mode NAT, VM terisolasi. Untuk mengakses SSH-nya dari luar, kita perlu membuat "terowongan" port. VirtualBox memiliki fitur Port Forwarding yang sangat mudah untuk ini.
+
+1. Matikan VM jika sedang berjalan. Konfigurasi jaringan hanya bisa diubah saat VM mati.
+   `VBoxManage controlvm "Nama VM Anda" poweroff`
+
+2. Buat Aturan Port Forwarding:
+   Perintah ini memberitahu VirtualBox: "Teruskan semua koneksi yang datang ke port 2222 di HOST ke port 22 di GUEST".
+
+   `VBoxManage modifyvm "Nama VM Anda" --natpf1 "ssh,tcp,,2222,,22"`
+
+   Penjelasan Aturan `--natpf1`:
+   - "ssh": Nama aturan (bisa apa saja).
+   - "tcp": Protokol.
+   - ",,": IP Host (dikosongkan berarti semua IP di host).
+   - "2222": Port di Host yang akan kita gunakan untuk terhubung.
+   - ",,": IP Guest (dikosongkan berarti IP default guest).
+   - "22": Port di Guest yang menjadi tujuan (port SSH).
+
+3. Nyalakan kembali VM:
+   `VBoxManage startvm "Nama VM Anda" --type headless`
+
+4. Hubungkan: SEKARANG, Anda terhubung ke IP HOST Anda di port 2222.
+   `ssh namauser@IP_HOST -p 2222`
+   Jika terhubung dari host itu sendiri, Anda bisa menggunakan:
+   `ssh namauser@127.0.0.1 -p 2222`
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: OTENTIKASI BERBASIS KUNCI (KEY-BASED AUTH)
+- Hipotesis: Menggunakan kunci SSH jauh lebih aman dan praktis daripada password.
+- Langkah:
+  1. Di komputer host Anda, buat pasangan kunci: `ssh-keygen -t ed25519`
+  2. Salin kunci publik Anda ke dalam VM: `ssh-copy-id -p PORT_SSH namauser@IP_HOST_ATAU_VM`
+     (Gunakan -p 2222 jika Anda pakai NAT port forwarding).
+  3. Coba login menggunakan kunci privat Anda. Seharusnya tidak ada permintaan password.
+- Observasi: Apakah Anda berhasil login tanpa password?
+- Jelaskan: Mengapa metode ini dianggap "standar emas" untuk keamanan server? (Jawaban: Karena kunci kriptografi jauh lebih kompleks daripada password apa pun, sehingga hampir mustahil untuk di-brute-force. Ini juga memungkinkan login otomatis untuk skrip dan otomatisasi).
+
+EKSPERIMEN 2: MENGUJI PORT FORWARDING NAT
+- Hipotesis: Aturan '--natpf1' secara efektif memetakan port host ke port guest.
+- Langkah:
+  1. Pastikan VM Anda berjalan dalam mode NAT dan aturan port forwarding sudah dibuat.
+  2. Dari komputer HOST, jalankan perintah koneksi SSH yang menunjuk ke localhost (komputer itu sendiri) di port yang Anda teruskan (misal 2222).
+     `ssh namauser@localhost -p 2222`
+- Observasi: Apakah Anda berhasil terhubung ke VM Anda, meskipun Anda menunjuk ke 'localhost'?
+- Jelaskan: Apa keuntungan utama menggunakan fitur port forwarding bawaan VirtualBox dibandingkan harus mengkonfigurasi 'iptables' secara manual di host Linux? (Jawaban: Kemudahan dan portabilitas. Fitur ini bekerja di semua OS host (Windows, macOS, Linux) dengan perintah yang sama dan tidak memerlukan hak akses root di host untuk mengkonfigurasinya, tidak seperti 'iptables' yang rumit dan spesifik Linux).

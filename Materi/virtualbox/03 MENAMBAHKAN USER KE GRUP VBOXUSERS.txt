@@ -1,0 +1,61 @@
+MATERI 03: MENAMBAHKAN USER KE GRUP VBOXUSERS
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memberikan izin kepada user Anda untuk mengelola VirtualBox tanpa perlu 'sudo'.
+- Memahami mengapa langkah ini penting untuk keamanan dan kenyamanan.
+
+KONSEP INTI
+
+DEFINISI & TUJUAN
+Secara default di Linux, hanya user 'root' yang memiliki izin penuh untuk berinteraksi dengan driver inti VirtualBox. Agar user biasa (Anda) bisa menjalankan perintah seperti 'VBoxManage' tanpa harus mengetik 'sudo' setiap saat, Anda perlu menjadi anggota grup khusus bernama 'vboxusers'.
+
+Ini adalah praktik standar yang membuat pengelolaan VM menjadi lebih mudah dan aman.
+
+PERINTAH UTAMA
+Untuk menambahkan user Anda yang sedang aktif ke grup 'vboxusers', jalankan perintah berikut:
+
+    sudo usermod -aG vboxusers $(whoami)
+
+PENJELASAN PERINTAH
+- sudo: Diperlukan karena kita memodifikasi konfigurasi user sistem.
+- usermod: Perintah untuk memodifikasi user.
+- -aG: Opsi ini berarti 'append' (menambahkan) ke 'Groups' (grup) sekunder. Ini PENTING agar Anda tidak kehilangan keanggotaan grup lain.
+- vboxusers: Nama grup spesifik untuk VirtualBox.
+- $(whoami): Akan otomatis diganti dengan username Anda saat ini.
+
+PENTING: MENGAPA HARUS RE-LOGIN?
+Sama seperti pada KVM, perubahan keanggotaan grup TIDAK langsung aktif di sesi terminal Anda. Sistem Linux hanya memuat daftar grup seorang user pada saat ia login.
+
+Oleh karena itu, setelah menjalankan perintah di atas, Anda WAJIB melakukan LOGOUT lalu LOGIN kembali agar perubahan diterapkan.
+
+LANGKAH VERIFIKASI
+Setelah login kembali, verifikasi dengan dua cara:
+1. Cek keanggotaan grup Anda. Pastikan 'vboxusers' ada dalam daftar.
+   `groups`
+
+2. Coba jalankan perintah VBoxManage tanpa sudo.
+   `VBoxManage list vms`
+
+Jika perintah kedua berjalan dan menampilkan daftar VM (meskipun kosong) tanpa error "permission denied", maka konfigurasi Anda berhasil.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: SEBELUM DAN SESUDAH
+- Hipotesis: Tanpa menjadi anggota 'vboxusers', 'VBoxManage' akan gagal. Setelah menjadi anggota dan re-login, perintah akan berhasil.
+- Langkah:
+  1. (Jika memungkinkan, lakukan ini dengan user baru yang belum masuk grup). Coba jalankan `VBoxManage list vms`. Anda akan melihat error.
+  2. Tambahkan user ke grup: `sudo usermod -aG vboxusers NAMA_USER`
+  3. Logout dan login kembali sebagai user tersebut.
+  4. Jalankan lagi `VBoxManage list vms`.
+- Observasi: Apakah error hilang setelah user ditambahkan ke grup dan melakukan re-login?
+- Jelaskan: Proses apa yang terjadi saat login yang membuat sistem mengenali keanggotaan grup yang baru? (Jawaban: Saat login, sistem membangun sebuah "sesi" untuk user, yang mencakup token keamanan berisi informasi UID, GID utama, dan daftar lengkap GID sekunder dari semua grup tempat user menjadi anggota).
+
+EKSPERIMEN 2: MELIHAT IZIN DRIVER
+- Hipotesis: Grup 'vboxusers' bekerja dengan cara memiliki izin khusus pada file driver VirtualBox.
+- Langkah:
+  1. Jalankan perintah ini di terminal host:
+     `ls -l /dev/vboxdrv`
+- Observasi: Lihat outputnya. Perhatikan kolom ke-4 (nama grup). Apakah nama grupnya adalah 'vboxusers'?
+- Jelaskan: Apa artinya ini dalam konteks izin di Linux? (Jawaban: Ini berarti bahwa hanya user 'root' (pemilik) dan anggota grup 'vboxusers' yang memiliki izin baca/tulis pada file driver inti VirtualBox. Inilah mekanisme yang mendasari mengapa menjadi anggota grup tersebut memberikan Anda hak akses).

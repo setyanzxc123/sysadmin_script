@@ -1,0 +1,80 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Akses VM via SSH
+
+=== Langkah Wajib (Makro) ===
+1) Pastikan 'openssh-server' terpasang di dalam OS guest.
+2) Pastikan service SSH berjalan di dalam guest.
+3) Ketahui alamat IP guest dan mode jaringannya (Bridge atau NAT).
+4.) Lakukan koneksi SSH dari host.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Setelah kita bisa mengakses konsol awal, langkah selanjutnya adalah mengelola VM dari jarak jauh dengan cara yang standar dan aman. SSH (Secure Shell) adalah protokol utama untuk administrasi server Linux melalui baris perintah.
+
+Langkah 1: Konfigurasi di Dalam Guest VM
+Langkah ini dilakukan DI DALAM VM, bukan di host. Anda bisa masuk dulu menggunakan 'virsh console'.
+
+# 1. Update dan install SSH server
+sudo apt update
+sudo apt install -y openssh-server
+
+# 2. Pastikan service-nya berjalan
+systemctl status ssh
+
+Jika tidak berjalan, aktifkan dengan: 'sudo systemctl enable --now ssh'
+
+Langkah 2: Mengetahui IP Address VM
+Cara mengetahui IP address VM Anda SANGAT BERGANTUNG pada mode jaringan yang Anda gunakan saat membuat VM.
+
+- JIKA PAKAI BRIDGE: VM Anda akan mendapat IP dari router utama Anda (misal: 192.168.1.x). Untuk mengetahuinya, jalankan 'ip addr' DI DALAM VM.
+- JIKA PAKAI NAT (Default): VM Anda mendapat IP dari jaringan virtual internal libvirt (misal: 192.168.122.x). Anda bisa melihatnya DARI HOST dengan perintah:
+  virsh net-dhcp-leases default
+
+Langkah 3: Cara Terhubung via SSH
+Ini juga bergantung pada mode jaringan.
+
+SKENARIO A: VM Menggunakan Jaringan BRIDGE
+Ini adalah skenario paling mudah. Karena VM Anda berada di jaringan yang sama dengan host, Anda bisa langsung SSH ke IP-nya.
+ssh namauser@IP_VM_DARI_BRIDGE
+
+SKENARIO B: VM Menggunakan Jaringan NAT (Default)
+Ini sedikit lebih rumit.
+- DARI HOST: Anda bisa langsung SSH ke IP internalnya (misal: 192.168.122.x) karena host terhubung langsung ke jaringan virtual tersebut.
+  ssh namauser@IP_VM_DARI_NAT
+
+- DARI KOMPUTER LAIN DI JARINGAN ANDA: Anda TIDAK BISA langsung SSH ke IP 192.168.122.x. Anda harus melakukan 'Port Forwarding' pada host. Konsepnya adalah membuat "terowongan" dari port di host ke port 22 di guest. Ini adalah topik lanjutan yang biasanya menggunakan 'iptables' di host.
+
+Contoh Port Forwarding (Lanjutan):
+# Memberitahu host: "Teruskan koneksi dari port 2222-mu ke port 22 milik VM 192.168.122.50"
+sudo iptables -t nat -A PREROUTING -p tcp --dport 2222 -j DNAT --to-destination 192.168.122.50:22
+
+# Lalu dari komputer lain, Anda akan SSH ke IP HOST, bukan IP GUEST
+ssh -p 2222 namauser@IP_HOST
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Otentikasi Berbasis Kunci (Key-Based Auth)
+- Hipotesis: Menggunakan kunci SSH jauh lebih aman dan praktis daripada password.
+- Langkah:
+    # 1. Di komputer host Anda, buat pasangan kunci baru jika belum punya
+    ssh-keygen -t ed25519 -f ~/.ssh/kunci_kvm
+
+    # 2. Salin kunci publik Anda ke dalam VM
+    ssh-copy-id -i ~/.ssh/kunci_kvm.pub namauser@IP_VM
+
+    # 3. Coba login menggunakan kunci privat Anda
+    ssh -i ~/.ssh/kunci_kvm namauser@IP_VM
+- Observasi: Apakah Anda berhasil login tanpa diminta password?
+- Jelaskan: Apa risiko jika izin folder '~/.ssh' atau file 'authorized_keys' di dalamnya salah (misalnya, terlalu terbuka untuk user lain)? (Jawaban: Server SSH akan menolak menggunakan kunci tersebut karena dianggap tidak aman. Izin yang benar dan ketat adalah syarat agar otentikasi kunci bisa bekerja, biasanya 700 untuk ~/.ssh dan 600 untuk authorized_keys).
+
+### Eksperimen 2: NAT vs Bridge (Studi Kasus SSH)
+- Hipotesis: Mode Bridge menyederhanakan akses dari LAN, sedangkan NAT memberikan isolasi.
+- Langkah:
+    # Buat satu VM dengan jaringan NAT dan satu lagi dengan Bridge.
+    # Coba SSH ke kedua VM dari komputer HOST Anda.
+    # Coba SSH ke kedua VM dari KOMPUTER LAIN di jaringan yang sama (misal: laptop teman).
+- Observasi: VM mana yang bisa di-SSH dari komputer lain tanpa perlu port forwarding? (Jawaban: VM dengan mode Bridge).
+- Jelaskan: Dengan kemudahan akses Bridge, kapan seseorang tetap memilih menggunakan NAT? (Jawaban: Saat keamanan dan isolasi lebih penting. Dengan NAT, VM terlindung di belakang firewall host secara default, dan hanya port yang secara eksplisit dibuka (forward) yang bisa diakses dari luar. Ini mengurangi permukaan serangan).

@@ -1,0 +1,67 @@
+MATERI 12: SNAPSHOT VM
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami fungsi snapshot sebagai "save point" untuk VM.
+- Mampu membuat, mengembalikan (restore), dan menghapus snapshot menggunakan 'VBoxManage'.
+
+KONSEP INTI
+
+DEFINISI & ANALOGI
+Snapshot adalah sebuah "foto" dari keadaan sebuah VM pada satu titik waktu tertentu. Ini mencakup keadaan hard disk, RAM (jika VM sedang berjalan), dan konfigurasi perangkat kerasnya.
+
+Analogi Terbaik: Anggap snapshot seperti "SAVE POINT" di sebuah video game. Sebelum Anda melawan bos yang sulit (misalnya, melakukan update software yang berisiko di VM), Anda membuat save point. Jika Anda kalah (update gagal dan sistem rusak), Anda bisa langsung kembali (restore) ke keadaan sebelum melawan bos, seolah-olah tidak terjadi apa-apa.
+
+PENTING: SNAPSHOT BUKAN BACKUP
+Snapshot masih bergantung pada file disk virtual aslinya. Jika file disk asli Anda rusak atau terhapus, semua snapshot-nya menjadi tidak berguna. Snapshot adalah untuk rollback jangka pendek, BUKAN untuk pemulihan bencana (disaster recovery).
+
+PERINTAH-PERINTAH UTAMA
+Semua perintah snapshot dikelola melalui sub-perintah 'snapshot'.
+
+1. MEMBUAT SNAPSHOT
+   `VBoxManage snapshot "Nama VM Anda" take "nama-snapshot" --description "Catatan singkat"`
+
+   Contoh:
+   `VBoxManage snapshot "Ubuntu Server Test" take "sebelum-install-docker" --description "Kondisi bersih sebelum Docker diinstall"`
+
+2. MELIHAT DAFTAR SNAPSHOT
+   `VBoxManage snapshot "Nama VM Anda" list`
+
+3. MENGEMBALIKAN KE SNAPSHOT
+   PERINGATAN: SEMUA PERUBAHAN YANG DIBUAT SETELAH SNAPSHOT DIAMBIL AKAN HILANG PERMANEN.
+
+   `VBoxManage snapshot "Nama VM Anda" restore "nama-snapshot"`
+
+   Setelah dikembalikan, Anda perlu menyalakan kembali VM-nya.
+
+4. MENGHAPUS SNAPSHOT
+   Menghapus snapshot yang sudah tidak diperlukan itu penting untuk menjaga performa dan menghemat ruang disk.
+
+   `VBoxManage snapshot "Nama VM Anda" delete "nama-snapshot"`
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: SIKLUS HIDUP SNAPSHOT
+- Hipotesis: Snapshot memungkinkan kita kembali ke keadaan file sistem sebelumnya.
+- Langkah:
+  1. Nyalakan VM, login, dan buat sebuah file: `touch /file_awal.txt`
+  2. Dari HOST, buat snapshot: `VBoxManage snapshot "Nama VM Anda" take "snap1"`
+  3. Kembali ke GUEST, buat file kedua: `touch /file_kedua.txt`. Verifikasi kedua file ada dengan `ls /`.
+  4. Dari HOST, matikan VM: `VBoxManage controlvm "Nama VM Anda" poweroff`
+  5. Kembalikan ke snapshot: `VBoxManage snapshot "Nama VM Anda" restore "snap1"`
+  6. Nyalakan lagi VM, login, dan cek isi root: `ls /`
+- Observasi: Apakah `/file_kedua.txt` hilang, sementara `/file_awal.txt` masih ada?
+- Jelaskan: Mengapa penting untuk menghapus snapshot setelah Anda yakin bahwa perubahan yang Anda lakukan (misalnya, update) sudah berhasil dan stabil? (Jawaban: Karena setiap snapshot membuat file disk baru (differencing image). Semakin banyak rantai snapshot, semakin kompleks dan lambat operasi baca/tulis disk, yang akan menurunkan performa VM).
+
+EKSPERIMEN 2: SNAPSHOT DARI VM YANG BERJALAN
+- Hipotesis: Mengambil snapshot dari VM yang sedang berjalan juga akan menyimpan isi RAM-nya.
+- Langkah:
+  1. Nyalakan VM, login, dan buka editor teks, misal: `nano /tmp/tes.txt`.
+  2. Ketik beberapa kalimat di dalam nano TAPI JANGAN DISIMPAN.
+  3. Saat nano masih terbuka, dari HOST, ambil snapshot: `VBoxManage snapshot "Nama VM Anda" take "snap-running"`
+  4. Dari HOST, matikan paksa VM: `VBoxManage controlvm "Nama VM Anda" poweroff`
+  5. Kembalikan ke snapshot: `VBoxManage snapshot "Nama VM Anda" restore "snap-running"`
+  6. Nyalakan lagi VM: `VBoxManage startvm "Nama VM Anda"`
+- Observasi: Apakah VM langsung menyala dan menampilkan kembali editor nano yang terbuka dengan teks yang belum disimpan?
+- Jelaskan: Apa keuntungan utama dari kemampuan menyimpan state RAM ini? (Jawaban: Ini memungkinkan kita untuk "membekukan" aplikasi yang sedang berjalan dalam keadaan tertentu. Sangat berguna untuk debugging atau untuk menyimpan state pekerjaan kompleks yang butuh waktu lama untuk disiapkan, sehingga bisa dilanjutkan lagi nanti persis dari titik yang sama).

@@ -1,0 +1,85 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Membuat VM dari ISO (virt-install)
+
+=== Langkah Wajib (Makro) ===
+1) Siapkan file ISO installer sistem operasi (misal: ubuntu-server-22.04.iso).
+2) Tentukan nama, sumber daya (CPU, RAM), dan penyimpanan untuk VM baru.
+3) Jalankan perintah 'virt-install' dengan semua parameter yang dibutuhkan.
+4) Akses konsol VM untuk menyelesaikan proses instalasi OS secara manual.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Ini adalah metode paling umum untuk membuat VM baru. Prosesnya mirip seperti menginstall OS di komputer fisik: Anda "memasukkan" CD/DVD instalasi (dalam bentuk file ISO) ke dalam mesin virtual, lalu menyalakannya untuk memulai proses instalasi.
+
+Metode ini digunakan saat Anda ingin kontrol penuh atas proses instalasi, seperti mengatur partisi, memilih paket, atau saat menginstall OS yang memiliki antarmuka grafis (desktop).
+
+Contoh Perintah Lengkap
+Berikut adalah contoh lengkap perintah 'virt-install' untuk membuat server Ubuntu tanpa grafis (headless).
+
+virt-install \
+--name ubuntu-server-test \
+--vcpus 2 \
+--memory 2048 \
+--cdrom /path/to/your/ubuntu-22.04.iso \
+--disk path=/var/lib/libvirt/images/ubuntu-server-test.qcow2,size=20,format=qcow2,bus=virtio \
+--network network=default,model=virtio \
+--os-variant ubuntu22.04 \
+--graphics none \
+--noautoconsole
+
+Perintah di atas terlihat panjang. Mari kita bedah bagian per bagian.
+
+Membedah Perintah 'virt-install'
+Anda bisa melihat perintah di atas sebagai serangkaian jawaban atas pertanyaan-pertanyaan berikut:
+
+1. Apa nama VM dan berapa resource-nya?
+- --name ubuntu-server-test: Memberi nama unik pada VM.
+- --vcpus 2: Memberikan 2 core CPU virtual.
+- --memory 2048: Mengalokasikan RAM sebesar 2048 MB (2 GB).
+
+2. Dari mana OS akan di-install?
+- --cdrom /path/to/your/ubuntu-22.04.iso: Menentukan lokasi file ISO yang akan digunakan sebagai media instalasi. PASTIKAN PATH INI BENAR.
+
+3. Di mana data VM akan disimpan?
+- --disk ...: Opsi ini mengatur hard disk virtual.
+  - path=/var/lib/libvirt/images/ubuntu-server-test.qcow2: Lokasi dan nama file hard disk yang akan dibuat.
+  - size=20: Ukuran hard disk adalah 20 GB.
+  - format=qcow2: Format file disk. 'qcow2' adalah pilihan terbaik karena mendukung fitur seperti snapshot.
+  - bus=virtio: Menggunakan driver 'virtio' yang performanya tinggi untuk disk.
+
+4. Bagaimana VM terhubung ke jaringan?
+- --network network=default,model=virtio: Menghubungkan VM ke jaringan virtual bernama 'default' (mode NAT) dan menggunakan driver jaringan 'virtio' yang cepat.
+
+5. Bagaimana cara kita mengakses tampilan instalasi?
+- --graphics none: Ini artinya kita tidak butuh antarmuka grafis (VNC/Spice). Kita akan mengaksesnya melalui konsol serial (teks). Ini adalah pilihan umum untuk server.
+- --noautoconsole: Jangan otomatis menghubungkan kita ke konsol VM setelah perintah dieksekusi. Kita akan terhubung manual nanti.
+
+6. Apakah ada optimasi khusus?
+- --os-variant ubuntu22.04: Memberi tahu KVM untuk mengoptimalkan pengaturan perangkat keras virtual untuk OS Ubuntu 22.04. Anda bisa melihat daftar lengkap dengan 'osinfo-query os'.
+
+Langkah Verifikasi
+Setelah menjalankan perintah 'virt-install', verifikasi bahwa VM sudah dibuat dan berjalan:
+virsh list
+
+Anda akan melihat VM Anda dalam keadaan 'running'. Selanjutnya, Anda perlu terhubung ke konsolnya untuk memulai instalasi OS (ini akan dibahas di materi 07).
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Pengaruh Resource
+- Hipotesis: Nilai pada '--memory' dan '--vcpus' akan tercermin di dalam sistem operasi guest setelah terinstall.
+- Langkah:
+    # Buat VM dengan resource spesifik, misal memory 1024 dan vcpus 1.
+    # Setelah OS terinstall, login ke dalam VM tersebut.
+    # Di dalam VM, jalankan perintah 'free -h' dan 'nproc'.
+- Observasi: Apakah output 'free -h' menunjukkan total memori sekitar 1GB? Apakah 'nproc' menunjukkan angka 1?
+- Jelaskan: Mengapa angka di dalam guest harus sama dengan yang didefinisikan di host? (Jawaban: Karena hypervisor (KVM) membuat dan menyajikan perangkat keras virtual (vCPU, RAM virtual) kepada OS guest sesuai dengan spesifikasi yang kita berikan saat pembuatan VM).
+
+### Eksperimen 2: Opsi Konsol
+- Hipotesis: Menghapus opsi '--noautoconsole' akan membuat 'virt-install' langsung mencoba menghubungkan kita ke konsol VM.
+- Langkah:
+    # Jalankan perintah virt-install yang sama seperti di atas, TAPI hapus opsi '--noautoconsole'.
+- Observasi: Apakah terminal Anda langsung "masuk" ke dalam layar instalasi VM setelah perintah dijalankan?
+- Jelaskan: Kapan opsi '--noautoconsole' berguna? (Jawaban: Sangat berguna saat Anda ingin membuat banyak VM secara otomatis (scripting). Anda bisa menjalankan perintah 'virt-install' tanpa harus terjebak di dalam sesi konsol, lalu melanjutkan ke perintah berikutnya).

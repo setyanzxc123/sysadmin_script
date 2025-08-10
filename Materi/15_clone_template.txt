@@ -1,0 +1,85 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Mengkloning VM & Membuat Template (Golden Image)
+
+=== Langkah Wajib (Makro) ===
+1) Buat satu VM dasar (base image) yang akan menjadi sumber kloning.
+2) Pahami masalah duplikasi identitas (MAC address, hostname).
+3) Gunakan 'virt-sysprep' untuk membersihkan identitas VM dasar dan menjadikannya template.
+4) Gunakan 'virt-clone' untuk membuat duplikat dari template tersebut.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Mengkloning (cloning) adalah proses membuat salinan identik dari sebuah VM yang sudah ada. Tujuannya adalah untuk EFISIENSI. Daripada menginstall OS dari nol setiap kali butuh VM baru, Anda cukup membuat satu VM "master", lalu mengkloningnya berkali-kali dalam hitungan detik.
+
+VM master yang sudah bersih dan siap untuk dikloning ini sering disebut "Golden Image" atau "Template".
+
+MASALAH PENTING: Duplikasi Identitas
+Jika Anda asal mengkloning VM, Anda akan menghadapi masalah besar. Kloning akan menyalin SEMUANYA, termasuk:
+- Alamat MAC kartu jaringan
+- Hostname
+- Kunci unik SSH (host keys)
+- Machine ID sistem
+
+Dua atau lebih VM dengan identitas yang sama di satu jaringan akan menyebabkan konflik alamat dan masalah konektivitas yang sangat sulit dilacak. Oleh karena itu, kita TIDAK PERNAH mengkloning VM yang sedang aktif digunakan.
+
+Alur Kerja yang Benar: Membuat Golden Image
+Solusinya adalah dengan membuat template yang "bersih" atau "steril".
+
+Langkah 1: Buat dan Siapkan VM Dasar
+- Buat sebuah VM seperti biasa (misal dari ISO).
+- Install OS, lakukan update (`sudo apt update && sudo apt upgrade`).
+- Install semua paket umum yang selalu Anda butuhkan (misal: `qemu-guest-agent`, `htop`).
+- Matikan VM ini dengan `virsh shutdown NAMA_VM_DASAR`.
+
+Langkah 2: Bersihkan Identitas dengan 'virt-sysprep'
+'virt-sysprep' adalah alat bantu untuk "menetralkan" sebuah VM dengan menghapus semua data uniknya.
+
+# Perintah ini dijalankan pada VM yang sudah dalam keadaan mati
+virt-sysprep -d NAMA_VM_DASAR
+
+Sekarang, 'NAMA_VM_DASAR' Anda sudah menjadi sebuah template yang siap dikloning. JANGAN PERNAH menyalakan template ini lagi. Jika butuh update, kloning template ini, lakukan update pada kloningannya, lalu sysprep kloningan tersebut untuk menjadi template versi baru.
+
+Langkah 3: Kloning dari Template
+Sekarang kita bisa membuat VM baru dari template kita.
+
+Sintaks Perintah:
+virsh-clone --original SUMBER --name TUJUAN --auto-clone
+
+Penjelasan Perintah 'virt-clone':
+- --original SUMBER: Nama VM template yang akan dikloning.
+- --name TUJUAN: Nama untuk VM baru hasil kloning.
+- --auto-clone: Secara otomatis membuat salinan file disk untuk VM baru.
+
+Contoh:
+virt-clone --original NAMA_VM_DASAR --name web-server-01 --auto-clone
+
+Setelah ini, 'web-server-01' akan menyala dengan konfigurasi dasar yang sama seperti template, tetapi dengan identitas (MAC address, dll) yang baru dan unik.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Membuktikan Pentingnya 'virt-sysprep'
+- Hipotesis: Mengkloning VM tanpa sysprep akan menghasilkan duplikat MAC address.
+- Langkah:
+    # 1. Buat sebuah VM biasa, jangan di-sysprep, lalu matikan.
+    # 2. Cek MAC address-nya: 'virsh domiflist NAMA_VM_KOTOR'
+    
+    # 3. Kloning VM kotor tersebut:
+    virt-clone --original NAMA_VM_KOTOR --name kloning-kotor --auto-clone
+    
+    # 4. Cek MAC address VM baru: 'virsh domiflist kloning-kotor'
+- Observasi: Apakah MAC address antara VM asli dan kloningannya sama persis? (Jawaban: Seharusnya tidak. `virt-clone` modern cukup pintar untuk membuat MAC baru, tapi ini tidak menjamin hostname dan SSH keys di dalamnya juga baru. Itulah mengapa sysprep tetap penting).
+- Jelaskan: Apa saja yang dibersihkan oleh `virt-sysprep`? (Jawaban: Banyak hal, termasuk history shell, log files, user accounts, konfigurasi jaringan, dan yang terpenting, SSH host keys dan machine-id).
+
+### Eksperimen 2: Template dari Cloud Image
+- Hipotesis: Template yang dibuat dari cloud-image tidak memerlukan 'virt-sysprep' karena 'cloud-init' akan menangani pembuatan identitas baru di setiap kloningan.
+- Langkah:
+    # 1. Buat sebuah "template" dari cloud image (seperti di materi 06), tapi jangan pernah dinyalakan.
+    # 2. Kloning template tersebut.
+    virt-clone --original template-cloud --name web-02 --auto-clone
+    # 3. Buat file user-data baru untuk web-02 (dengan hostname/user berbeda).
+    # 4. Buat ISO dari user-data tersebut, lalu attach ke web-02 dan nyalakan.
+- Observasi: Apakah VM 'web-02' berhasil boot dengan identitas baru yang didefinisikan di user-data?
+- Jelaskan: Apa kelebihan utama menggunakan cloud-image sebagai basis template dibandingkan image hasil instalasi ISO? (Jawaban: Prosesnya jauh lebih cepat dan dirancang untuk otomatisasi. Cloud-image + cloud-init adalah fondasi dari cara kerja cloud modern, di mana VM dibuat dan dikonfigurasi secara massal tanpa intervensi manual).

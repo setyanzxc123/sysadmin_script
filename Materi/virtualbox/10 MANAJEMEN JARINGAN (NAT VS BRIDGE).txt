@@ -1,0 +1,63 @@
+MATERI 10: MANAJEMEN JARINGAN (NAT VS BRIDGE)
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami mode jaringan utama di VirtualBox: NAT, Bridged, dan Host-Only.
+- Mampu mengkonfigurasi mode jaringan VM menggunakan 'VBoxManage'.
+
+KONSEP INTI
+
+VirtualBox menawarkan beberapa cara untuk menghubungkan VM Anda ke jaringan. Memilih yang tepat sangat penting.
+
+ANALOGI JARINGAN KANTOR
+Bayangkan Host Anda adalah sebuah kantor, dan VM Anda adalah seorang karyawan baru.
+- NAT (Network Address Translation): Karyawan ditempatkan di ruangan belakang yang terisolasi. Ia bisa menelepon keluar (mengakses internet), tapi orang lain di kantor tidak bisa menghubunginya langsung. Paling aman.
+- Bridged Adapter: Karyawan mendapat meja sendiri di ruang kerja utama (LAN Anda). Ia mendapat alamat IP dari router utama dan bisa berinteraksi bebas dengan semua orang di kantor. Paling mudah diakses.
+- Host-Only Adapter: Anda membuat jaringan PRIBADI khusus antara Anda (host) dan karyawan (VM). Orang lain di kantor (di LAN) bahkan tidak tahu jaringan ini ada. Berguna untuk lab yang aman.
+
+PERINTAH KONFIGURASI JARINGAN
+Konfigurasi jaringan dilakukan dengan 'modifyvm' saat VM dalam keadaan mati. 'nic1' mengacu pada kartu jaringan pertama.
+
+MODE 1: NAT (DEFAULT)
+Ini adalah mode default. VM bisa mengakses internet tapi terisolasi.
+    VBoxManage modifyvm "Nama VM Anda" --nic1 nat
+
+MODE 2: BRIDGED ADAPTER
+VM menjadi bagian dari jaringan fisik Anda.
+    VBoxManage modifyvm "Nama VM Anda" --nic1 bridged --bridgeadapter1 NAMA_INTERFACE
+
+- NAMA_INTERFACE: Anda harus memberitahu VirtualBox interface fisik mana di host yang akan "dijembatani".
+  - Di Linux: Cari dengan `ip addr` (misal: enp3s0, wlp2s0).
+  - Di Windows: Cari dengan `ipconfig` (misal: Ethernet, Wi-Fi).
+
+MODE 3: HOST-ONLY ADAPTER
+Jaringan pribadi antara host dan guest.
+    VBoxManage modifyvm "Nama VM Anda" --nic1 hostonly --hostonlyadapter1 NAMA_ADAPTER
+
+- NAMA_ADAPTER: VirtualBox membuat interface virtual di host untuk jaringan ini (misal: vboxnet0).
+  - Cari dengan `VBoxManage list hostonlyifs`.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MEMBANDINGKAN ALAMAT IP
+- Hipotesis: Setiap mode jaringan akan memberikan alamat IP dari subnet yang berbeda kepada guest.
+- Langkah:
+  1. Matikan VM Anda.
+  2. Set jaringan ke NAT: `VBoxManage modifyvm "Nama VM Anda" --nic1 nat`
+  3. Nyalakan VM, login, jalankan `ip addr` dan catat IP-nya (seharusnya seperti 10.0.2.15).
+  4. Matikan VM.
+  5. Set jaringan ke Bridged: `VBoxManage modifyvm "Nama VM Anda" --nic1 bridged --bridgeadapter1 NAMA_INTERFACE`
+  6. Nyalakan VM, login, jalankan `ip addr` dan catat IP-nya (seharusnya dari range IP LAN Anda, misal 192.168.1.x).
+- Observasi: Apakah alamat IP yang didapat VM berubah drastis sesuai dengan mode jaringannya?
+- Jelaskan: Mengapa IP dari mode NAT tidak bisa di-ping dari komputer lain di LAN Anda? (Jawaban: Karena IP tersebut hanya ada di dalam jaringan virtual internal yang dibuat oleh VirtualBox di dalam komputer host. Router dan perangkat lain di LAN tidak mengetahui keberadaan jaringan 10.0.2.0/24 tersebut).
+
+EKSPERIMEN 2: MENGUJI KONEKTIVITAS HOST-ONLY
+- Hipotesis: Jaringan Host-Only hanya memungkinkan komunikasi antara host dan guest, tidak lebih.
+- Langkah:
+  1. Set jaringan VM ke Host-Only.
+  2. Nyalakan VM dan catat alamat IP-nya (seharusnya dari range vboxnet0, misal 192.168.56.x).
+  3. Dari terminal HOST, coba ping ke IP VM tersebut. Seharusnya berhasil.
+  4. Dari KOMPUTER LAIN di jaringan LAN Anda, coba ping ke IP VM tersebut. Seharusnya gagal (Destination Host Unreachable).
+- Observasi: Apakah hasil ping sesuai dengan hipotesis?
+- Jelaskan: Untuk skenario development apa mode Host-Only ini sangat berguna? (Jawaban: Saat membuat server development (misal: database atau web backend) di VM. Anda sebagai developer di komputer host bisa mengaksesnya, tapi server tersebut sepenuhnya terisolasi dan aman dari jaringan kantor/rumah utama).

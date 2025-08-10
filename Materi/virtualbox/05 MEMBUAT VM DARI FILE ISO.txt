@@ -1,0 +1,91 @@
+MATERI 05: MEMBUAT VM DARI FILE ISO
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Membuat sebuah VM baru dari file ISO menggunakan baris perintah 'VBoxManage'.
+- Memahami alur kerja "merakit" VM di VirtualBox.
+
+KONSEP INTI
+
+ALUR KERJA VBOXMANAGE
+Berbeda dengan 'virt-install' di KVM yang bisa melakukan semuanya dalam satu perintah panjang, 'VBoxManage' bekerja secara bertahap. Kita akan melakukan hal berikut:
+1. Membuat "kotak" VM yang kosong.
+2. Mengatur spesifikasinya (RAM, CPU, Jaringan).
+3. Membuat "hard disk" virtual.
+4. "Memasang" hard disk dan file ISO instalasi ke VM.
+5. Menyalakan VM untuk memulai instalasi.
+
+LANGKAH-LANGKAH PEMBUATAN VM
+
+Asumsi: Anda sudah punya file ISO, misal 'ubuntu-server-22.04.iso'.
+
+LANGKAH 1: MEMBUAT DEFINISI VM
+Perintah ini membuat VM kosong dan mendaftarkannya ke VirtualBox.
+
+    VBoxManage createvm --name "Ubuntu Server Test" --ostype "Ubuntu_64" --register
+
+Penjelasan:
+- --name: Nama VM yang akan muncul di daftar.
+- --ostype: Tipe OS untuk optimasi. WAJIB diisi. Untuk melihat daftar lengkap, jalankan 'VBoxManage list ostypes'.
+- --register: Mendaftarkan VM yang baru dibuat.
+
+LANGKAH 2: MENGATUR SPESIFIKASI VM
+Sekarang kita modifikasi "kotak" kosong tersebut.
+
+    # Mengatur RAM menjadi 2048 MB (2 GB) dan CPU menjadi 2 core
+    VBoxManage modifyvm "Ubuntu Server Test" --memory 2048 --cpus 2
+
+    # Mengatur kartu jaringan ke mode bridge, terhubung ke interface 'enp3s0'
+    # Ganti 'enp3s0' dengan nama interface jaringan Anda.
+    VBoxManage modifyvm "Ubuntu Server Test" --nic1 bridged --bridgeadapter1 enp3s0
+
+LANGKAH 3: MEMBUAT HARD DISK VIRTUAL
+Kita buat file hard disk .vdi sebesar 20 GB.
+
+    VBoxManage createhd --filename "Ubuntu Server Test.vdi" --size 20480 --format VDI
+
+Penjelasan:
+- --filename: Nama file disk yang akan dibuat.
+- --size: Ukuran dalam Megabyte (20480 MB = 20 GB).
+- --format: Format disk. VDI adalah format asli VirtualBox.
+
+LANGKAH 4: MEMBUAT STORAGE CONTROLLER
+VM butuh "port" untuk menghubungkan disk. Kita buat port SATA.
+
+    VBoxManage storagectl "Ubuntu Server Test" --name "SATA Controller" --add sata --controller IntelAhci
+
+LANGKAH 5: MEMASANG DISK DAN ISO
+Sekarang kita pasang hard disk dan file ISO ke port SATA yang baru dibuat.
+
+    # Pasang hard disk .vdi ke port 0
+    VBoxManage storageattach "Ubuntu Server Test" --storagectl "SATA Controller" --port 0 --device 0 --type hdd --medium "Ubuntu Server Test.vdi"
+
+    # Pasang file ISO ke port 1 (sebagai DVD drive)
+    VBoxManage storageattach "Ubuntu Server Test" --storagectl "SATA Controller" --port 1 --device 0 --type dvddrive --medium /path/ke/file/ubuntu-server-22.04.iso
+
+LANGKAH 6: MENJALANKAN VM
+VM sudah selesai dirakit. Sekarang kita nyalakan.
+
+    VBoxManage startvm "Ubuntu Server Test"
+
+Sebuah jendela akan muncul menampilkan proses instalasi Ubuntu, sama seperti di komputer fisik.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MEMBUAT SKRIP INSTALASI
+- Hipotesis: Semua perintah di atas dapat digabungkan menjadi satu skrip untuk otomatisasi.
+- Langkah:
+  1. Buka editor teks dan buat file baru bernama 'buat_vm.sh'.
+  2. Salin semua perintah dari Langkah 1 hingga 5 ke dalam file tersebut.
+  3. Simpan file, lalu jalankan dengan `bash buat_vm.sh`.
+- Observasi: Apakah skrip tersebut berhasil membuat VM baru tanpa intervensi manual?
+- Jelaskan: Mengapa menggunakan CLI dan skrip lebih unggul daripada menggunakan GUI untuk membuat banyak VM yang identik? (Jawaban: Skrip memastikan prosesnya konsisten, dapat diulang, dan sangat cepat. Anda bisa membuat 10 VM identik dalam hitungan detik dengan menjalankan skrip, sementara dengan GUI Anda harus mengklik wizard 10 kali, yang memakan waktu dan rentan kesalahan manusia).
+
+EKSPERIMEN 2: MENJELAJAHI TIPE OS
+- Hipotesis: Menyediakan '--ostype' yang benar memberikan pengaturan default yang lebih baik.
+- Langkah:
+  1. Jalankan `VBoxManage list ostypes`.
+  2. Perhatikan variasi yang ada, misalnya untuk Windows ("Windows10", "Windows11_64") atau Linux lainnya ("RedHat_64", "Debian_64").
+- Observasi: Apa saja tipe OS yang tersedia?
+- Jelaskan: Apa saja contoh pengaturan default yang mungkin dioptimalkan oleh VirtualBox saat kita memilih '--ostype' yang tepat? (Jawaban: VirtualBox mungkin akan otomatis memilih tipe storage controller yang paling cocok (misal: AHCI untuk OS modern), mengaktifkan/menonaktifkan fitur seperti I/O APIC, dan merekomendasikan jumlah RAM/VRAM minimum yang sesuai dengan OS tersebut).

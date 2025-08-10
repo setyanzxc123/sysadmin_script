@@ -1,0 +1,92 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Monitoring & Troubleshooting
+
+=== Langkah Wajib (Makro) ===
+1) Pantau status dan penggunaan resource VM secara rutin menggunakan 'virsh' dan 'virt-top'.
+2) Jika terjadi masalah, periksa log libvirt di host.
+3) Jika masalah spesifik pada VM, periksa log QEMU untuk VM tersebut.
+4) Jangan lupa memeriksa log di dalam OS guest itu sendiri.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Materi ini terbagi dua:
+- Monitoring: Proses proaktif memantau "kesehatan" dan kinerja VM Anda untuk mendeteksi potensi masalah.
+- Troubleshooting: Proses reaktif mencari penyebab dan solusi saat masalah sudah terjadi.
+
+Menguasai keduanya sangat penting untuk menjaga agar lingkungan virtualisasi Anda berjalan stabil.
+
+---
+### Bagian 1: Monitoring (Memantau Kinerja VM)
+
+Berikut adalah beberapa perintah utama untuk memantau VM dari host.
+
+1. Melihat Status Dasar
+- virsh list --all
+  Fungsi: Cara tercepat untuk melihat VM mana yang sedang 'running' dan mana yang 'shut off'.
+
+2. Melihat Statistik Real-time
+- virsh domstats NAMA_VM
+  Fungsi: Menampilkan statistik lengkap dan terus berubah untuk sebuah VM, termasuk penggunaan CPU, memori, dan I/O disk/jaringan. Sangat berguna untuk melihat beban kerja saat itu.
+
+3. Alat Bantu 'virt-top'
+'virt-top' adalah alat yang sangat direkomendasikan. Anggap saja ini seperti perintah 'top' atau 'htop', tapi khusus untuk melihat penggunaan resource oleh VM dari sudut pandang host.
+- Cara Install: 'sudo apt install virt-top'
+- Cara Pakai: Cukup jalankan 'virt-top' di terminal.
+
+---
+### Bagian 2: Troubleshooting (Mencari Akar Masalah)
+
+Jika sebuah VM gagal start, berjalan lambat, atau error, berikut adalah urutan tempat untuk mencari petunjuk.
+
+Langkah 1: Periksa Log Service Libvirt
+Ini adalah tempat pertama untuk mencari tahu kenapa VM gagal start atau kenapa ada masalah dengan service libvirt.
+- Perintah: journalctl -u libvirtd -f
+  (-f artinya 'follow', untuk melihat log baru secara real-time).
+- Lokasi File: Log ini diambil dari log sistem terpusat (journald).
+
+Langkah 2: Periksa Log Spesifik VM dari QEMU
+Setiap VM memiliki file log-nya sendiri yang mencatat output dari proses QEMU. Ini berguna untuk masalah yang lebih dalam.
+- Lokasi File: /var/log/libvirt/qemu/NAMA_VM.log
+- Contoh: sudo tail -f /var/log/libvirt/qemu/web01.log
+
+Langkah 3: Periksa Log di Dalam OS Guest
+Kadang masalahnya bukan di hypervisor, tapi di dalam sistem operasi VM itu sendiri.
+- Cara: Login ke dalam VM (via SSH atau 'virsh console').
+- Periksa log sistem guest, misalnya dengan 'journalctl -f' atau melihat file di '/var/log/'.
+
+Masalah Umum
+- VM lambat karena I/O disk: Periksa apakah host storage sedang sibuk, pastikan cache mode disk sudah tepat, dan selalu gunakan driver 'virtio'.
+- Jaringan VM sering putus: Pastikan menggunakan model NIC 'virtio'.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Monitoring Beban Kerja
+- Hipotesis: 'virt-top' dan 'virsh domstats' akan secara akurat merefleksikan beban kerja di dalam guest.
+- Langkah:
+    # 1. Di terminal pertama, buka virt-top
+    virt-top
+
+    # 2. Login ke dalam salah satu VM Anda.
+    # 3. Di dalam VM, install 'stress-ng' jika belum ada: 'sudo apt install stress-ng'
+    # 4. Beri beban CPU yang tinggi di dalam VM:
+    stress-ng --cpu 1 --timeout 60s
+
+    # 5. Amati perubahan pada output 'virt-top' di terminal pertama.
+- Observasi: Apakah persentase CPU untuk VM tersebut di 'virt-top' melonjak mendekati 100% selama 'stress-ng' berjalan?
+- Jelaskan: Selain CPU, metrik apa lagi di 'virt-top' yang penting untuk dipantau? (Jawaban: RX/TX untuk aktivitas jaringan, dan BlkR/BlkW untuk aktivitas baca/tulis disk. Lonjakan pada metrik-metrik ini menunjukkan VM sedang aktif menggunakan jaringan atau disk).
+
+### Eksperimen 2: Mendiagnosa Masalah dari Log
+- Hipotesis: Log libvirt akan mencatat pesan error yang jelas jika kita mencoba membuat VM dengan konfigurasi yang salah.
+- Langkah:
+    # 1. Buka sesi 'follow' log libvirt.
+    journalctl -u libvirtd -f
+
+    # 2. Di terminal lain, coba buat VM dengan menunjuk ke file ISO yang tidak ada.
+    virt-install --name test-gagal --memory 1024 --cdrom /path/tidak/ada/iso.iso --disk size=5
+
+    # 3. Amati output error di terminal pertama yang memantau log.
+- Observasi: Apakah muncul pesan error di log yang mengandung kata-kata seperti "Cannot access' / 'No such file or directory"?
+- Jelaskan: Mengapa memeriksa log adalah langkah pertama yang lebih baik daripada sekadar menebak-nebak saat troubleshooting? (Jawaban: Karena log memberikan pesan error yang spesifik dan kontekstual langsung dari sumber masalah, yang secara drastis mempersempit area pencarian dan mengarahkan kita ke solusi yang tepat lebih cepat).

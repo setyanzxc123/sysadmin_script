@@ -1,0 +1,210 @@
+Panduan Umum: Mengonlinekan Web Server PHP (Apache/Nginx)
+Gabungan Semua Bagian
+
+Tujuan:
+Panduan ini akan memandu Anda secara lengkap untuk menginstall, mengkonfigurasi, dan mengamankan web server PHP di lingkungan Linux (Ubuntu/Debian), baik di server fisik (bare metal) maupun di dalam Virtual Machine (KVM/VirtualBox), hingga bisa diakses dari internet.
+
+
+BAGIAN 1: INSTALASI & KONFIGURASI DASAR (UMUM UNTUK SEMUA PLATFORM)
+
+Tujuan Bagian Ini:
+Menyiapkan fondasi web server di dalam server Linux Anda. Langkah-langkah di sini 100% sama, tidak peduli Anda menggunakan KVM, VirtualBox, atau server fisik (bare metal). Semua perintah dijalankan di dalam server/VM Anda.
+
+
+Langkah 1: Pilih dan Instal Tumpukan Web Server Anda
+
+Anda memiliki dua pilihan populer: Apache atau Nginx. Pilih salah satu.
+
+Opsi A: Instal Apache + PHP
+(Metode yang lebih tua, konfigurasi sangat mudah)
+    sudo apt update
+    sudo apt install -y apache2 php libapache2-mod-php php-cli php-mysql
+
+Opsi B: Instal Nginx + PHP-FPM
+(Metode modern, umumnya lebih hemat resource)
+    sudo apt update
+    sudo apt install -y nginx php-fpm php-cli php-mysql
+
+
+Langkah 2: Siapkan Direktori Web dan Atur Izin
+
+Web server perlu folder untuk menyimpan file website. Standarnya adalah /var/www/html.
+
+# Buat direktori jika belum ada
+    sudo mkdir -p /var/www/html
+
+# Atur kepemilikan ke user web server (www-data untuk Ubuntu/Debian)
+    sudo chown -R www-data:www-data /var/www/html
+
+# Atur izin standar yang aman (pemilik bisa tulis, yang lain hanya baca)
+    sudo chmod -R 755 /var/www/html
+
+
+Langkah 3: Konfigurasi Web Server untuk PHP
+
+Langkah ini penting, terutama jika Anda memilih Nginx.
+
+Jika Anda menggunakan Apache:
+Umumnya, Apache sudah siap melayani file PHP setelah instalasi. Anda bisa langsung lanjut ke Langkah 4.
+
+Jika Anda menggunakan Nginx:
+Anda perlu memberitahu Nginx cara memproses file PHP.
+
+1. Buka file konfigurasi default:
+   `sudo nano /etc/nginx/sites-available/default`
+
+2. Pastikan isinya kurang lebih seperti ini, terutama bagian `index` dan `location ~ \.php$`:
+   server {
+       listen 80 default_server;
+       root /var/www/html;
+       index index.php index.html;
+       server_name _;
+
+       location / {
+           try_files $uri $uri/ =404;
+       }
+
+       location ~ \.php$ {
+           include snippets/fastcgi-php.conf;
+           fastcgi_pass unix:/run/php/php-fpm.sock;
+       }
+   }
+
+3. Tes konfigurasi dan muat ulang Nginx:
+   `sudo nginx -t && sudo systemctl reload nginx`
+
+
+Langkah 4: Upload File Website Anda
+
+Pindahkan file website dari komputer lokal Anda ke server. `rsync` adalah cara terbaik.
+
+Jalankan perintah ini dari komputer LOKAL Anda:
+# Ganti './website/' dengan path folder website Anda
+# Ganti 'user@IP_SERVER' dengan user dan IP server/VM Anda
+    rsync -avzP ./website/ user@IP_SERVER:/var/www/html/
+
+
+BAGIAN 2: MENGHUBUNGKAN SERVER KE INTERNET
+
+Tujuan Bagian Ini:
+Membuat web server Anda dapat diakses oleh siapa saja dari internet.
+
+
+Langkah 5: Temukan Alamat IP Lokal Server Anda
+
+Anda perlu tahu alamat IP server Anda di jaringan lokal (LAN) agar router tahu ke mana harus meneruskan traffic.
+
+Skenario A: Jika Anda menggunakan Server Fisik (Bare Metal)
+Jalankan perintah ini di server untuk menemukan IP-nya:
+    `ip addr`
+
+Skenario B: Jika Anda menggunakan VM dengan Jaringan Bridge (KVM/VirtualBox)
+Ini berfungsi sama seperti server fisik. Jalankan perintah ini di dalam VM:
+    `ip addr`
+
+Skenario C: Jika Anda menggunakan VM dengan Jaringan NAT (KVM/VirtualBox)
+Anda perlu tahu IP LOKAL dari komputer HOST (komputer yang menjalankan KVM/VirtualBox), bukan IP VM-nya.
+Untuk menemukan IP Host: Jalankan `ip addr` di komputer host Anda.
+CATATAN: Untuk pemula SANGAT DISARANKAN menggunakan Jaringan Bridge jika tujuannya adalah mengonlinekan server.
+
+
+Langkah 6: Konfigurasi Port Forwarding di Router
+
+Langkah ini dilakukan di panel admin router internet Anda, bukan di server.
+
+Konsep: Port forwarding memberitahu router Anda, "Jika ada traffic internet masuk ke port 80 atau 443, tolong teruskan ke alamat IP lokal server saya".
+
+Langkah-langkah Umum:
+1. Login ke panel admin router Anda (biasanya `192.168.1.1` atau `192.168.0.1`).
+2. Cari menu bernama "Port Forwarding", "Virtual Server", atau "NAT Forwarding".
+3. Buat dua aturan baru untuk protokol TCP:
+   - Teruskan port eksternal 80 ke port internal 80 di IP lokal server Anda.
+   - Teruskan port eksternal 443 ke port internal 443 di IP lokal server Anda.
+4. Simpan pengaturan.
+
+
+BAGIAN 3: DOMAIN DAN HTTPS (UMUM UNTUK SEMUA PLATFORM)
+
+Tujuan Bagian Ini:
+Memberi nama domain pada server Anda dan mengamankannya dengan enkripsi HTTPS.
+
+
+Langkah 7: Hubungkan Nama Domain
+
+Skenario A: Jika IP Internet Anda Dinamis (Umum untuk Rumahan)
+Gunakan layanan DDNS seperti DuckDNS. Buat skrip di server untuk otomatis mengupdate IP Anda.
+# Buat skrip update
+    sudo tee /usr/local/bin/duckdns.sh >/dev/null <<'EOF'
+    #!/usr/bin/env bash
+    # Ganti namadomain dan token sesuai akun DuckDNS Anda
+    echo url="https://www.duckdns.org/update?domains=namadomain&token=isi_token&ip=" | curl -k -o /tmp/duckdns.log -K -
+    EOF
+    sudo chmod +x /usr/local/bin/duckdns.sh
+
+# Jalankan skrip setiap 5 menit via cron
+# Buka editor crontab: 'crontab -e' dan tambahkan baris berikut:
+    */5 * * * * /usr/local/bin/duckdns.sh
+
+Skenario B: Jika IP Internet Anda Statis
+Di panel DNS domain Anda, buat 'A record' yang menunjuk ke IP publik statis Anda.
+
+
+Langkah 8: Amankan dengan HTTPS (Certbot)
+
+Gunakan Certbot dari Let's Encrypt untuk mendapatkan sertifikat SSL/TLS gratis.
+
+1. Instal Certbot dan plugin yang sesuai:
+   # Untuk Apache
+   sudo apt install certbot python3-certbot-apache
+
+   # Untuk Nginx
+   sudo apt install certbot python3-certbot-nginx
+
+2. Jalankan Certbot untuk mendapatkan dan menginstall sertifikat:
+   # Untuk Apache
+   sudo certbot --apache -d domainanda.com -d www.domainanda.com
+
+   # Untuk Nginx
+   sudo certbot --nginx -d domainanda.com -d www.domainanda.com
+
+
+BAGIAN 4: STUDI KASUS - DEPLOY APLIKASI PHP LANJUTAN (OPSIONAL)
+
+Tujuan Bagian Ini:
+Menunjukkan contoh konfigurasi untuk framework PHP modern seperti CodeIgniter.
+
+
+Studi Kasus A: Deploy CodeIgniter 4
+
+CI4 memiliki struktur folder modern di mana web root berada di subfolder `/public`.
+
+1. Instal Ekstensi PHP Tambahan:
+   `sudo apt install -y php-intl php-mbstring php-curl php-xml php-zip php-gd`
+
+2. Konfigurasi Web Server:
+   - Apache: Ubah `DocumentRoot` di konfigurasi VirtualHost Anda menjadi `/var/www/html/public`. Pastikan `AllowOverride All` aktif.
+   - Nginx: Ubah `root` di konfigurasi server block Anda menjadi `/var/www/html/public;`.
+
+3. Atur Izin Folder `writable`:
+   Folder `writable` di dalam CodeIgniter butuh izin tulis oleh web server.
+   `sudo chmod -R 775 /var/www/html/writable`
+
+4. Konfigurasi `.env`:
+   Salin file `env` menjadi `.env` dan sesuaikan `CI_ENVIRONMENT` menjadi `production` dan `app.baseURL` dengan nama domain Anda.
+
+
+Studi Kasus B: Deploy CodeIgniter 3
+
+CI3 memiliki struktur yang lebih tua di mana `index.php` berada di root proyek.
+
+1. Instal Ekstensi PHP (sama seperti CI4).
+
+2. Konfigurasi Web Server:
+   - Apache: `DocumentRoot` menunjuk ke root proyek (misal: `/var/www/html`). Anda WAJIB membuat file `.htaccess` di root tersebut untuk menangani URL routing.
+   - Nginx: `root` menunjuk ke root proyek. Aturan `try_files` di `location /` sangat penting untuk routing.
+
+3. Konfigurasi Aplikasi:
+   Buka `application/config/config.php` dan atur `base_url`, kosongkan `index_page`, dan isi `encryption_key`.
+
+4. Atur Izin Folder:
+   Beri izin tulis untuk `application/cache` dan `application/logs`.

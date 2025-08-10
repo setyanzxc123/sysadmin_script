@@ -1,0 +1,68 @@
+MATERI 07: AKSES AWAL VM (HEADLESS & VRDP)
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami cara menjalankan VM di latar belakang (headless mode).
+- Mengenal dan menggunakan VRDP untuk mengakses tampilan grafis VM dari jarak jauh.
+
+KONSEP INTI
+
+APA ITU HEADLESS MODE?
+Menjalankan VM secara "headless" berarti VM tersebut berjalan di latar belakang (background process) tanpa ada jendela aplikasi yang terlihat di desktop Anda. Ini adalah cara standar untuk menjalankan VM server, karena Anda tidak perlu melihat antarmuka grafisnya setiap saat.
+
+BAGAIMANA CARA MENGAKSES TAMPILANNYA?
+Jika VM berjalan di latar belakang, bagaimana cara kita melihat proses instalasi OS atau layarnya? Jawabannya adalah VRDP.
+
+VRDP (VirtualBox Remote Display Protocol) adalah fitur bawaan VirtualBox yang berfungsi seperti server Remote Desktop mini untuk setiap VM. Saat diaktifkan, Anda bisa menggunakan RDP client apa pun (misalnya, aplikasi Remote Desktop di Windows atau Remmina di Linux) untuk terhubung ke tampilan VM tersebut.
+
+LANGKAH-LANGKAH
+
+LANGKAH 1: MENJALANKAN VM DALAM MODE HEADLESS
+Gunakan perintah 'startvm' dengan tipe 'headless'.
+
+    VBoxManage startvm "Nama VM Anda" --type headless
+
+Setelah menjalankan perintah ini, VM akan menyala di latar belakang. Anda tidak akan melihat jendela apa pun, tapi prosesnya berjalan. Anda bisa memverifikasinya dengan 'VBoxManage list runningvms'.
+
+LANGKAH 2: MENGAKTIFKAN DAN MENGETAHUI PORT VRDP
+Secara default, VRDP tidak aktif. Kita harus mengaktifkannya dengan 'modifyvm'.
+
+    # Aktifkan VRDP untuk VM
+    VBoxManage modifyvm "Nama VM Anda" --vrde on
+
+    # (Opsional) Mengatur port VRDP secara manual jika perlu
+    VBoxManage modifyvm "Nama VM Anda" --vrdeport 3390
+
+Secara default, VirtualBox akan menggunakan port 3389 untuk VM pertama, 3390 untuk kedua, dst. Untuk melihat port yang sedang digunakan oleh sebuah VM, Anda bisa menjalankan:
+
+    VBoxManage showvminfo "Nama VM Anda" | grep VRDE
+
+LANGKAH 3: MENGHUBUNGKAN DENGAN RDP CLIENT
+1. Buka aplikasi RDP client Anda.
+2. Untuk alamat server, masukkan alamat IP komputer HOST Anda diikuti dengan port VRDP. Jika Anda terhubung dari komputer host itu sendiri, Anda bisa menggunakan '127.0.0.1'.
+   Contoh: `127.0.0.1:3389`
+3. Hubungkan. Anda akan melihat jendela yang menampilkan layar VM Anda, seolah-olah Anda duduk di depannya.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: SIKLUS HIDUP VM HEADLESS
+- Hipotesis: Kita bisa menyalakan dan mematikan VM di latar belakang tanpa pernah melihat jendelanya.
+- Langkah:
+  1. Jalankan VM: `VBoxManage startvm "Nama VM Anda" --type headless`
+  2. Verifikasi sedang berjalan: `VBoxManage list runningvms`
+  3. Tunggu beberapa saat.
+  4. Matikan VM (secara paksa): `VBoxManage controlvm "Nama VM Anda" poweroff`
+  5. Verifikasi sudah mati: `VBoxManage list runningvms` (output seharusnya kosong).
+- Observasi: Apakah Anda berhasil menyalakan dan mematikan VM tanpa ada jendela yang muncul di layar?
+- Jelaskan: Mengapa mode headless sangat penting untuk lingkungan server? (Jawaban: Server seringkali tidak memiliki desktop environment (GUI) sama sekali. Mode headless memungkinkan kita menjalankan VM di server tersebut dan mengelolanya sepenuhnya dari jarak jauh via SSH dan VRDP, tanpa perlu antarmuka grafis di host).
+
+EKSPERIMEN 2: KONEKSI VRDP
+- Hipotesis: VRDP memungkinkan akses grafis ke VM headless.
+- Langkah:
+  1. Pastikan VRDP aktif untuk VM Anda: `VBoxManage modifyvm "Nama VM Anda" --vrde on`
+  2. Jalankan VM dalam mode headless.
+  3. Cek port VRDP-nya dengan `showvminfo`.
+  4. Buka RDP client dan coba hubungkan ke `127.0.0.1:PORT_VRDP`.
+- Observasi: Apakah Anda berhasil melihat tampilan VM di RDP client Anda?
+- Jelaskan: Apa keuntungan menggunakan VRDP bawaan VirtualBox dibandingkan menginstall server VNC (seperti TightVNC) di dalam OS guest? (Jawaban: VRDP bekerja di level hypervisor, artinya ia aktif sejak VM pertama kali dinyalakan. Ini memungkinkan kita untuk melihat seluruh proses boot dan bahkan mengakses menu BIOS/UEFI dari VM. Server VNC di dalam guest baru akan aktif setelah OS-nya selesai booting).

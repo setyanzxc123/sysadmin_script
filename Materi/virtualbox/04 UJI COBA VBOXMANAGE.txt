@@ -1,0 +1,55 @@
+MATERI 04: UJI COBA VBOXMANAGE
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memverifikasi bahwa instalasi VirtualBox berhasil.
+- Memastikan perintah 'VBoxManage' dapat diakses dan dijalankan tanpa 'sudo'.
+- Mengkonfirmasi bahwa izin user Anda sudah benar.
+
+KONSEP INTI
+
+DEFINISI & TUJUAN
+Ini adalah langkah "sanity check" atau pengecekan kewarasan. Sebelum kita melangkah ke proses yang lebih rumit seperti membuat VM, kita harus yakin dulu bahwa fondasi kita (instalasi dan izin) sudah kokoh.
+
+Jika langkah ini gagal, berarti ada yang salah pada materi 02 (Instalasi) atau 03 (Izin Grup), dan harus diperbaiki terlebih dahulu.
+
+PERINTAH PENGUJIAN
+
+Ada dua perintah sederhana untuk melakukan verifikasi:
+
+1. Cek Versi (Paling Dasar):
+   `VBoxManage --version`
+   Perintah ini hanya mengecek apakah aplikasi 'VBoxManage' ada dan bisa dijalankan. Jika ini berhasil, artinya instalasi dasar Anda sukses.
+
+2. Cek Daftar VM (Tes Fungsional):
+   `VBoxManage list vms`
+   Perintah ini lebih dari sekadar mengecek file. Ia akan mencoba berkomunikasi dengan driver dan service VirtualBox. Ini adalah tes yang sesungguhnya untuk izin user.
+
+OUTPUT YANG DIHARAPKAN
+- Untuk `VBoxManage --version`: Anda akan melihat nomor versi, misal '7.0.10r158379'.
+- Untuk `VBoxManage list vms`: Karena kita belum membuat VM, output yang sukses adalah KOSONG. Tidak ada teks yang muncul sama sekali.
+
+YANG TERPENTING adalah tidak ada pesan error seperti "permission denied" atau "Kernel driver not installed (rc=-1908)". Output kosong adalah tanda sukses.
+
+MASALAH UMUM & SOLUSI
+- "VBoxManage: command not found": Aplikasi tidak terinstall dengan benar atau path-nya tidak dikenali oleh shell Anda. Ulangi Materi 02.
+- Error "permission denied" atau sejenisnya: User Anda belum masuk ke grup 'vboxusers' ATAU Anda belum logout dan login kembali setelah ditambahkan ke grup. Ulangi Materi 03.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: VERIFIKASI IZIN
+- Hipotesis: Menjalankan 'VBoxManage list vms' tanpa 'sudo' akan langsung menunjukkan apakah izin user sudah benar atau belum.
+- Langkah:
+  1. Buka terminal baru (pastikan Anda sudah re-login setelah Materi 03).
+  2. Jalankan `VBoxManage list vms`.
+- Observasi: Apakah perintah tersebut berjalan tanpa error dan tanpa menghasilkan output apa pun?
+- Jelaskan: Mengapa output kosong pada kasus ini adalah sebuah keberhasilan? (Jawaban: Karena perintah tersebut berhasil berkomunikasi dengan service VirtualBox untuk meminta daftar VM. Service tersebut merespons dengan benar bahwa daftarnya memang kosong. Kegagalan akan ditandai dengan pesan error, bukan daftar kosong).
+
+EKSPERIMEN 2: MENJELAJAHI KEMAMPUAN VBOXMANAGE
+- Hipotesis: 'VBoxManage' adalah alat yang sangat kuat dengan banyak sekali sub-perintah.
+- Langkah:
+  1. Jalankan perintah 'VBoxManage' tanpa argumen apa pun.
+     `VBoxManage`
+- Observasi: Perhatikan daftar panjang sub-perintah yang muncul, dikelompokkan berdasarkan kategori.
+- Jelaskan: Berdasarkan daftar tersebut, sebutkan tiga sub-perintah yang menurut Anda akan kita gunakan di materi-materi selanjutnya untuk membuat dan mengelola VM. (Jawaban: Kemungkinan besar adalah `createvm`, `modifyvm`, `startvm`, `controlvm`, `storageattach`, dll. Ini menunjukkan bahwa hampir semua aspek manajemen VM bisa dikontrol dari CLI).

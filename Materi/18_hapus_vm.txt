@@ -1,0 +1,85 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Menghapus VM
+
+=== Langkah Wajib (Makro) ===
+1) Matikan VM yang akan dihapus.
+2) Hapus definisi (konfigurasi) VM dari libvirt menggunakan 'virsh undefine'.
+3) (Opsional) Hapus file disk virtual secara manual untuk mengosongkan ruang.
+4. Pahami risiko menggunakan opsi '--remove-all-storage'.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Menghapus VM adalah proses membersihkan resource yang sudah tidak terpakai. Proses ini terdiri dari dua bagian yang terpisah:
+1. Menghapus 'konfigurasi' atau 'definisi' VM dari daftar libvirt.
+2. Menghapus 'file disk' atau 'storage volume' dari host.
+
+PENTING untuk memahami bahwa ini adalah dua hal yang berbeda. Menghapus definisi tidak otomatis menghapus file disknya.
+
+---
+### Alur Kerja Menghapus VM yang Aman
+
+Berikut adalah urutan langkah yang paling aman untuk menghapus VM.
+
+Langkah 1: Matikan VM
+VM harus dalam keadaan 'shut off' sebelum definisinya bisa dihapus.
+virsh shutdown NAMA_VM
+# Atau jika tidak merespons
+virsh destroy NAMA_VM
+
+Langkah 2: Hapus Definisi VM (Undefine)
+Perintah 'undefine' akan menghapus VM dari daftar 'virsh list'.
+virsh undefine NAMA_VM
+
+Setelah perintah ini, VM tersebut sudah tidak lagi dikelola oleh libvirt.
+PENTING: Perintah ini HANYA menghapus konfigurasinya. File hard disk-nya (.qcow2) MASIH ADA dan aman di dalam storage pool Anda.
+
+Langkah 3: Hapus File Disk (Opsional)
+Jika Anda juga ingin menghapus data dan mengosongkan ruang disk, Anda harus menghapus storage volume-nya secara manual.
+
+# 1. Cari tahu nama volume dan pool-nya
+virsh domblklist NAMA_VM_SEBELUM_DIHAPUS
+# Catat path atau nama volumenya
+
+# 2. Hapus volume dari pool
+virsh vol-delete NAMA_VOLUME --pool NAMA_POOL
+
+Atau, jika Anda tidak menggunakan pool, hapus file-nya langsung dengan perintah 'rm' (lakukan dengan hati-hati).
+
+---
+### Cara Cepat (Berisiko): Menggunakan --remove-all-storage
+
+Ada cara cepat untuk melakukan Langkah 2 dan 3 sekaligus.
+
+Sintaks Perintah:
+virsh undefine NAMA_VM --remove-all-storage
+
+PERINGATAN: OPSI INI SANGAT BERBAHAYA. Ia akan menghapus definisi VM DAN semua file disk yang terhubung dengannya secara PERMANEN. Tidak ada konfirmasi dan tidak ada 'undo'. Gunakan hanya jika Anda 100% yakin ingin menghapus semuanya.
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Hapus Aman vs Hapus Total
+- Hipotesis: 'virsh undefine' tanpa opsi tambahan tidak akan menghapus file disk.
+- Langkah:
+    # 1. Pastikan Anda tahu di pool mana disk VM Anda berada.
+    # 2. Matikan VM: 'virsh destroy nama_vm_tes'
+    # 3. Hapus definisinya: 'virsh undefine nama_vm_tes'
+    
+    # 4. Cek apakah VM sudah hilang dari daftar:
+    virsh list --all
+    
+    # 5. Cek apakah file disknya masih ada di pool:
+    virsh vol-list NAMA_POOL
+- Observasi: Apakah VM sudah tidak ada di 'virsh list', tetapi file disknya masih ada di 'virsh vol-list'? (Jawaban: Ya, seharusnya begitu).
+- Jelaskan: Kapan skenario "hapus definisi tapi simpan disk" ini berguna? (Jawaban: Sangat berguna jika Anda ingin membuat ulang VM dengan konfigurasi berbeda (misal RAM lebih besar) tapi tetap menggunakan data dari disk yang lama. Anda bisa 'undefine' VM lama, lalu 'define' VM baru menggunakan file XML yang sudah dimodifikasi sambil menunjuk ke file disk yang ada).
+
+### Eksperimen 2: Mendeteksi Disk "Yatim" (Orphaned)
+- Hipotesis: Setelah VM di-undefine, file disknya menjadi "yatim" atau tidak memiliki pemilik. Kita bisa mendeteksinya.
+- Langkah:
+    # Perintah 'vol-list' menampilkan informasi VM yang menggunakan volume tersebut.
+    # Jika tidak ada VM yang menggunakan, kolom alokasinya akan kosong.
+    virsh vol-list NAMA_POOL
+- Observasi: Cari volume dari VM yang baru saja Anda hapus. Apakah kolom 'Allocation' atau 'Kapasitas' untuk volume tersebut sekarang kosong atau menunjukkan tidak terpakai?
+- Jelaskan: Apa strategi terbaik untuk merapikan disk-disk yatim di lingkungan produksi? (Jawaban: Lakukan audit secara berkala. Dapatkan daftar semua volume, dapatkan daftar semua disk yang sedang digunakan oleh VM yang ada, lalu bandingkan kedua daftar tersebut untuk menemukan volume mana yang tidak terhubung ke VM mana pun. Sebelum menghapus, pastikan untuk memverifikasi bahwa volume tersebut benar-benar sudah tidak dibutuhkan).

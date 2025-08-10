@@ -1,0 +1,68 @@
+## Sesi 1 — Tutorial & Penjelasan
+
+### Pendahuluan & Konsep Dasar
+
+=== Langkah Wajib (Makro) ===
+1) Pahami peran KVM, QEMU, dan libvirt serta alur kerjanya.
+2) Tentukan strategi jaringan (NAT/Bridge) dan storage (image/pool).
+3) Siapkan host Ubuntu dan rencana penamaan VM/pool/network.
+4) Ikuti urutan materi untuk instalasi, pembuatan VM, dan akses.
+
+=== Langkah Mikro & Konsep Inti ===
+
+**Definisi**
+KVM (Kernel-based Virtual Machine) adalah teknologi virtualisasi bawaan kernel Linux yang memungkinkan Linux bertindak sebagai hypervisor. KVM bekerja bersama QEMU untuk emulasi perangkat virtual (seperti hard disk & network card) dan dikelola dengan mudah melalui libvirt.
+
+**Analogi Sederhana: Membangun Mobil Virtual**
+Bayangkan Anda sedang membangun sebuah mobil (Virtual Machine) di dalam komputer Anda:
+- KVM (Mesin): Ini adalah teknologi inti di dalam Linux yang memberikan tenaga agar mobil virtual berjalan cepat.
+- QEMU (Rangka & Komponen): Ini adalah semua komponen virtual lainnya, seperti hard disk, kartu jaringan, dll.
+- Libvirt (Dasbor & Kunci Kontak): Ini adalah alat (`virsh`, `virt-install`) yang kita gunakan untuk menyalakan, mematikan, dan mengelola mobil virtual kita dengan mudah.
+
+**Tujuan Penggunaan**
+- Menjalankan beberapa sistem operasi (guest) di atas satu komputer (host) Linux.
+- Membangun lab untuk belajar, membuat server, atau infrastruktur cloud.
+- Mengelola semua VM sepenuhnya melalui baris perintah (CLI), tanpa antarmuka grafis.
+
+**Perintah Utama yang Akan Digunakan**
+Di materi-materi selanjutnya, kita akan sering bertemu dengan beberapa perintah utama:
+- `virsh`: Anggap ini sebagai "pisau Swiss Army" Anda untuk mengelola VM yang *sudah ada*, seperti menyalakan, mematikan, atau melihat statusnya.
+- `virt-install`: Perintah ini digunakan untuk *membuat dan menginstall VM baru* dari awal.
+- `qemu-img`: Ini adalah alat khusus untuk mengelola file "hard disk" virtual (disebut *image*), seperti membuat atau mengubah ukurannya.
+- `osinfo-query`: Perintah bantu untuk melihat daftar sistem operasi yang didukung libvirt agar proses instalasi lebih optimal.
+
+**Masalah Umum & Solusi**
+- Modul KVM tidak termuat: Kemungkinan virtualisasi belum aktif di BIOS/UEFI. Coba `sudo modprobe kvm_intel` (untuk CPU Intel) atau `sudo modprobe kvm_amd` (untuk CPU AMD).
+- Host tidak mendukung VT-x/AMD-V: Fitur virtualisasi belum diaktifkan di BIOS/UEFI komputer Anda. Anda harus restart dan mengaktifkannya dari sana.
+
+**Tips & Best Practice**
+- Gunakan OS yang stabil dan didukung jangka panjang (LTS), seperti Ubuntu Server 22.04/24.04.
+- Jika memungkinkan, gunakan disk fisik terpisah untuk menyimpan file-file VM agar performa lebih kencang.
+- Selalu utamakan driver `virtio` untuk jaringan dan disk, karena ini memberikan performa terbaik.
+
+---
+## Sesi 2 — Eksperimen Pemahaman
+
+### Eksperimen 1: Cek Virtualisasi CPU
+* **Hipotesis:** CPU yang mendukung virtualisasi (VT-x/AMD-V) akan menampilkan flag `vmx` (Intel) atau `svm` (AMD).
+* **Langkah:** Jalankan salah satu perintah ini untuk memeriksa.
+    ```bash
+    lscpu | grep -i virtualization
+    # atau jika perintah di atas kosong
+    egrep -i 'vmx|svm' /proc/cpuinfo
+    ```
+* **Observasi:** Apakah ada output `Virtualization: VT-x` (Intel) atau `Virtualization: AMD-V` (AMD)? Apakah ada flag `vmx` atau `svm` yang muncul?
+* **Jelaskan:** Apa dampaknya jika tidak ada flag ini terhadap KVM? (Jawaban: KVM tidak akan bisa berjalan sama sekali, karena akselerasi perangkat keras dari CPU tidak tersedia).
+
+### Eksperimen 2: Muat Modul KVM
+* **Hipotesis:** Jika CPU mendukung, modul kernel KVM dapat dimuat tanpa error.
+* **Langkah:**
+    ```bash
+    # Coba muat modul sesuai CPU Anda (abaikan error dari salah satunya)
+    sudo modprobe kvm_intel || sudo modprobe kvm_amd
+    
+    # Cek apakah modul sudah termuat
+    lsmod | grep kvm
+    ```
+* **Observasi:** Apakah `kvm` dan `kvm_intel` (atau `kvm_amd`) muncul di daftar?
+* **Jelaskan:** Kenapa modul bisa gagal dimuat meskipun CPU mendukung? (Hint: Fitur virtualisasi mungkin dinonaktifkan di level BIOS/UEFI, atau jika Anda menjalankan ini di dalam VM lain, *nested virtualization* mungkin belum aktif di host utamanya).

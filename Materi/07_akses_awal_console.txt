@@ -1,0 +1,72 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Akses Pertama VM (Serial Console & VNC)
+
+=== Langkah Wajib (Makro) ===
+1) Pilih metode akses yang sesuai: Serial Console (untuk server) atau VNC (untuk GUI).
+2) Gunakan 'virsh console' untuk terhubung ke VM headless.
+3) PAHAMI dan HAFALKAN kombinasi tombol keluar dari konsol (Ctrl+]).
+4) (Opsional) Gunakan VNC viewer untuk terhubung ke VM dengan antarmuka grafis.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Setelah VM dibuat dengan 'virt-install', ia akan langsung berjalan. Langkah selanjutnya adalah bagaimana kita bisa "melihat" tampilan VM tersebut untuk melanjutkan instalasi OS atau untuk login pertama kali. Ada dua cara utama untuk ini.
+
+---
+### Metode 1: Serial Console (Untuk Server/Headless)
+
+Ini adalah metode yang paling umum untuk server. Anda berinteraksi dengan VM melalui antarmuka teks, seolah-olah terhubung dengan kabel serial. Metode ini digunakan saat Anda membuat VM dengan opsi '--graphics none'.
+
+Sintaks Perintah
+Untuk terhubung ke konsol serial sebuah VM, gunakan perintah:
+virsh console NAMA_VM
+
+Contoh:
+virsh console ubuntu-server-test
+
+Setelah perintah ini dijalankan, terminal Anda akan langsung menampilkan output dari VM. Ini bisa berupa layar instalasi Ubuntu, atau prompt login jika Anda menggunakan cloud image.
+
+PENTING: CARA KELUAR DARI VIRSH CONSOLE
+Setelah Anda masuk ke dalam konsol VM, terminal Anda seolah-olah menjadi milik VM tersebut. Untuk kembali ke terminal host Anda, Anda HARUS menekan kombinasi tombol:
+
+Tekan CTRL, lalu tekan ] (tombol kurung siku kanan)
+
+Ini adalah 'escape sequence'. Banyak pemula yang merasa "terjebak" di dalam konsol karena tidak mengetahui hal ini.
+
+---
+### Metode 2: VNC Console (Untuk Desktop/GUI)
+
+Metode ini digunakan jika Anda menginstall OS dengan antarmuka grafis (misal: Ubuntu Desktop, Windows) atau jika Anda menambahkan opsi '--graphics vnc' saat membuat VM.
+
+Prosesnya:
+1. Libvirt akan membuat server VNC untuk setiap VM grafis. Server ini biasanya berjalan di IP host Anda (misal: 127.0.0.1) pada port mulai dari 5900, 5901, dst.
+2. Untuk mengetahui port VNC sebuah VM, jalankan:
+   virsh vncdisplay NAMA_VM
+3. Anda kemudian menggunakan aplikasi VNC client (seperti 'vncviewer', 'virt-viewer', atau 'Remmina') untuk terhubung ke alamat dan port tersebut (misal: 127.0.0.1:5900).
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Terhubung ke Konsol
+- Hipotesis: 'virsh console' hanya akan berfungsi jika VM dikonfigurasi dengan '--graphics none' dan OS di dalamnya mendukung output ke serial.
+- Langkah:
+    # Pastikan Anda punya VM yang dibuat dengan --graphics none
+    virsh start NAMA_VM_HEADLESS
+    
+    # Coba terhubung
+    virsh console NAMA_VM_HEADLESS
+- Observasi: Apakah Anda berhasil masuk dan melihat prompt login atau output lainnya dari VM?
+- Jelaskan: Apa yang terjadi jika Anda mencoba 'virsh console' ke VM yang dibuat dengan '--graphics vnc'? (Jawaban: Biasanya tidak akan ada output apa pun atau koneksi langsung ditutup, karena VM tersebut tidak mengirimkan outputnya ke perangkat serial virtual, melainkan ke perangkat grafis virtual).
+
+### Eksperimen 2: Latihan Keluar dari Konsol
+- Hipotesis: Kombinasi 'Ctrl+]' adalah satu-satunya cara standar untuk melepaskan diri dari sesi 'virsh console' tanpa mematikan koneksi SSH atau terminal utama.
+- Langkah:
+    # Masuk ke dalam sesi konsol
+    virsh console NAMA_VM_HEADLESS
+
+    # Setelah di dalam, coba ketik beberapa perintah.
+
+    # Sekarang, tekan Ctrl+]
+- Observasi: Apakah Anda langsung kembali ke prompt shell host Anda?
+- Jelaskan: Mengapa perlu ada 'escape sequence' khusus? (Jawaban: Karena 'virsh console' menyerahkan kontrol penuh keyboard Anda ke VM. Tanpa escape sequence, tidak ada cara bagi terminal host untuk tahu kapan Anda ingin berhenti berbicara dengan VM dan mulai berbicara lagi dengannya. Semua input (termasuk Ctrl+C) akan dikirim ke dalam VM).

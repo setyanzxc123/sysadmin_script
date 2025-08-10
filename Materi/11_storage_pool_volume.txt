@@ -1,0 +1,89 @@
+## Sesi 1 - Tutorial & Penjelasan
+
+### Manajemen Storage Pool & Volume
+
+=== Langkah Wajib (Makro) ===
+1) Definisikan sebuah lokasi terpusat untuk menyimpan disk VM (Storage Pool).
+2) Aktifkan dan atur pool tersebut agar otomatis berjalan.
+3) Buat disk virtual baru (Storage Volume) di dalam pool tersebut.
+4) Gunakan volume yang baru dibuat sebagai disk untuk VM.
+
+=== Langkah Mikro & Konsep Inti ===
+
+Definisi & Tujuan
+Sejauh ini, kita menaruh file disk VM di sebuah path langsung, misal '/var/lib/libvirt/images/nama.qcow2'. Cara ini berfungsi, tapi tidak terorganisir. Storage Pool adalah cara yang lebih baik dan rapi.
+
+Analogi Sederhana: Lemari Arsip
+- Tanpa Pool: Anda menyimpan file disk VM di mana saja. Ini seperti menaruh dokumen-dokumen penting sembarangan di lantai. Berantakan dan susah dikelola.
+- Dengan Pool: Anda membuat sebuah "LEMARI ARSIP" khusus untuk semua disk VM Anda. Lemari ini disebut STORAGE POOL.
+- Di dalam lemari tersebut, setiap disk VM adalah sebuah "MAP FOLDER" yang rapi. Map ini disebut STORAGE VOLUME.
+
+Tujuannya adalah untuk menata penyimpanan VM secara terpusat agar lebih mudah dikelola, diotomasi, dan dipantau.
+
+---
+### Langkah 1: Membuat Storage Pool
+
+Untuk membuat pool, ada 3 perintah berurutan. Kita akan menggunakan tipe pool 'dir', yang artinya pool kita hanyalah sebuah direktori di sistem file.
+
+# 1. (Opsional) Buat direktorinya jika belum ada
+sudo mkdir -p /var/lib/libvirt/storage-pools/pool-satu
+
+# 2. Definisikan Pool
+# Perintah ini memberitahu libvirt tentang pool baru kita.
+virsh pool-define-as pool-satu dir --target /var/lib/libvirt/storage-pools/pool-satu
+
+# 3. Start Pool
+# Definisi saja tidak cukup, pool harus dijalankan agar aktif.
+virsh pool-start pool-satu
+
+# 4. Autostart Pool
+# Atur agar pool ini otomatis aktif setiap host menyala.
+virsh pool-autostart pool-satu
+
+Setelah 4 langkah ini, 'pool-satu' Anda sudah siap digunakan. Anda bisa verifikasi dengan 'virsh pool-list --all'.
+
+---
+### Langkah 2: Membuat Storage Volume di Dalam Pool
+
+Sekarang "lemari arsip" kita sudah siap, kita bisa membuat "map folder" atau disk baru di dalamnya.
+
+Sintaks Perintah:
+virsh vol-create-as NAMA_POOL NAMA_VOLUME_BARU UKURAN --format FORMAT
+
+Contoh:
+# Membuat volume bernama 'disk-web-01.qcow2' sebesar 25GB di dalam 'pool-satu'
+virsh vol-create-as pool-satu disk-web-01.qcow2 25G --format qcow2
+
+Sekarang Anda punya volume baru yang siap digunakan. Anda bisa verifikasi dengan 'virsh vol-list pool-satu'.
+
+Untuk menggunakan volume ini saat membuat VM baru, pada opsi '--disk', Anda cukup menunjuk ke pool dan volume:
+--disk pool=pool-satu,vol=disk-web-01.qcow2
+
+---
+## Sesi 2 - Eksperimen Pemahaman
+
+### Eksperimen 1: Membuat Pool & Volume dari Awal
+- Hipotesis: Perintah-perintah 'virsh pool-*' dan 'virsh vol-*' menyediakan alur kerja lengkap untuk menyiapkan storage.
+- Langkah:
+    # Definisikan pool baru bernama 'testing-pool' di direktori /tmp/vm-storage
+    sudo mkdir -p /tmp/vm-storage
+    virsh pool-define-as testing-pool dir --target /tmp/vm-storage
+    virsh pool-start testing-pool
+    
+    # Buat volume 5GB di dalamnya
+    virsh vol-create-as testing-pool my-test-disk.img 5G
+
+    # Verifikasi
+    virsh pool-list
+    virsh vol-list testing-pool
+- Observasi: Apakah pool dan volume berhasil dibuat dan muncul di daftar?
+- Jelaskan: Kenapa format 'qcow2' lebih sering dipilih daripada 'raw' untuk volume VM? (Jawaban: qcow2 mendukung fitur-fitur canggih seperti 'thin provisioning' (ukuran file tumbuh sesuai pemakaian, bukan langsung sebesar kapasitasnya) dan snapshot internal, sedangkan 'raw' tidak).
+
+### Eksperimen 2: Manfaat Abstraksi Pool
+- Hipotesis: Mengelola disk via pool lebih baik karena kita tidak perlu hafal path fisik file-nya.
+- Langkah:
+    # Kita sudah punya volume 'my-test-disk.img' di dalam 'testing-pool'.
+    # Cek di mana sebenarnya lokasi fisik file tersebut.
+    virsh vol-path --pool testing-pool my-test-disk.img
+- Observasi: Perintah di atas menunjukkan path lengkap ke file, yaitu '/tmp/vm-storage/my-test-disk.img'.
+- Jelaskan: Apa risiko jika kita selalu menggunakan path fisik langsung ('/tmp/vm-storage/...') saat mendefinisikan disk VM, dibandingkan menggunakan referensi pool ('pool=testing-pool,...')? (Jawaban: Jika suatu saat Anda memindahkan direktori pool, semua VM yang merujuk ke path fisik akan rusak. Jika menggunakan referensi pool, Anda cukup mengupdate lokasi pool di satu tempat saja dan semua VM akan otomatis mengikuti).

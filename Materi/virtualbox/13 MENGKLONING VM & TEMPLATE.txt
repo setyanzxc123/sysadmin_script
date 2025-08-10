@@ -1,0 +1,79 @@
+MATERI 13: MENGKLONING VM & TEMPLATE
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami cara membuat duplikat VM secara cepat menggunakan 'VBoxManage clonevm'.
+- Mempelajari pentingnya "Golden Image" (template) dan cara mempersiapkannya.
+
+KONSEP INTI
+
+DEFINISI & TUJUAN
+Mengkloning adalah proses membuat salinan identik dari sebuah VM. Tujuannya adalah untuk efisiensi dan konsistensi. Daripada menginstall OS dari nol, Anda cukup membuat satu VM "master" yang sudah di-update dan dikonfigurasi, lalu mengkloningnya setiap kali Anda butuh VM baru.
+
+MASALAH PENTING: DUPLIKASI IDENTITAS
+Kloning mentah akan menyalin SEMUANYA, termasuk identitas unik seperti:
+- Alamat MAC kartu jaringan (meskipun VBoxManage cukup pintar untuk membuat yang baru).
+- Hostname.
+- Kunci unik SSH server (host keys).
+- Machine ID sistem.
+
+Menjalankan dua VM dengan identitas yang sama di satu jaringan akan menyebabkan konflik dan masalah yang sulit didiagnosis.
+
+ALUR KERJA YANG BENAR: GOLDEN IMAGE
+Solusinya adalah membuat template yang "bersih" atau "steril" sebelum dikloning.
+
+LANGKAH 1: BUAT DAN SIAPKAN VM DASAR
+- Install sebuah VM Ubuntu Server seperti biasa.
+- Lakukan update dan install semua paket standar yang Anda perlukan (misal: `qemu-guest-agent`, `htop`, `curl`).
+
+LANGKAH 2: BERSIHKAN IDENTITAS (MANUAL SYSPREP)
+VirtualBox tidak punya alat otomatis seperti 'virt-sysprep'. Kita harus melakukannya secara manual DI DALAM GUEST VM.
+
+    # 1. (Di dalam Guest) Hapus kunci SSH server yang ada.
+    sudo rm -f /etc/ssh/ssh_host_*
+
+    # 2. (Di dalam Guest) Bersihkan machine-id.
+    sudo truncate -s 0 /etc/machine-id
+    sudo rm /var/lib/dbus/machine-id
+    sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
+
+    # 3. (Di dalam Guest) Hapus history terminal dan matikan VM.
+    history -c
+    sudo poweroff
+
+Sekarang VM Anda sudah menjadi template yang "bersih" dan siap dikloning. JANGAN PERNAH menyalakannya lagi.
+
+LANGKAH 3: KLONING DARI TEMPLATE
+Gunakan perintah 'clonevm' untuk membuat salinan dari template Anda.
+
+    VBoxManage clonevm "Nama VM Template" --name "Nama VM Baru" --register
+
+Penjelasan:
+- "Nama VM Template": Nama VM sumber yang sudah bersih dan mati.
+- --name "Nama VM Baru": Nama untuk VM hasil kloning.
+- --register: Otomatis mendaftarkan VM baru ke VirtualBox.
+
+Saat VM baru ini dinyalakan pertama kali, OS akan otomatis membuat ulang hostname dan kunci SSH yang unik.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MEMBUKTIKAN DUPLIKASI SSH KEY
+- Hipotesis: Mengkloning VM yang "kotor" (tanpa dibersihkan) akan menyebabkan peringatan keamanan SSH.
+- Langkah:
+  1. Ambil sebuah VM biasa yang belum dibersihkan (VM kotor). Matikan.
+  2. Kloning VM tersebut: `VBoxManage clonevm "VM Kotor" --name "Kloningan Kotor" --register`
+  3. Nyalakan kedua VM tersebut (pastikan keduanya mendapat IP yang berbeda, misal dengan mode Bridge).
+  4. Dari komputer host Anda, SSH ke VM Kotor: `ssh user@IP_VM_KOTOR`.
+  5. Sekarang, coba SSH ke kloningannya: `ssh user@IP_KLONINGAN_KOTOR`.
+- Observasi: Apakah Anda mendapatkan peringatan besar yang menakutkan tentang "MAN-IN-THE-MIDDLE ATTACK"?
+- Jelaskan: Mengapa peringatan ini muncul? (Jawaban: Karena klien SSH Anda sudah menyimpan kunci publik dari IP pertama. Saat Anda mencoba terhubung ke IP kedua, server di sana menyajikan kunci publik yang SAMA PERSIS. Klien SSH Anda menganggap ini sebagai tanda bahaya, karena bisa jadi ada pihak ketiga yang mencoba menyamar sebagai server tujuan. Ini membuktikan bahwa kedua VM memiliki identitas SSH yang identik).
+
+EKSPERIMEN 2: FULL CLONE VS. LINKED CLONE
+- Hipotesis: Linked clone dapat menghemat banyak ruang disk tapi memiliki ketergantungan.
+- Langkah:
+  1. Buat kloningan biasa (full clone): `VBoxManage clonevm "VM Template" --name "Full-Clone" --register`
+  2. Buat kloningan tertaut (linked clone): `VBoxManage clonevm "VM Template" --name "Linked-Clone" --register --options link`
+  3. Cek ukuran file disk virtual (.vdi) dari kedua kloningan tersebut di folder VM Anda.
+- Observasi: Apakah ukuran file disk "Linked-Clone.vdi" jauh lebih kecil (hanya beberapa MB) dibandingkan "Full-Clone.vdi"?
+- Jelaskan: Apa keuntungan dan kerugian terbesar dari Linked Clone? (Jawaban: Keuntungannya adalah hemat ruang disk secara masif, karena ia hanya menyimpan perbedaan dari disk aslinya. Kerugiannya adalah ia SANGAT BERGANTUNG pada VM template aslinya. Jika template asli dihapus atau rusak, semua linked clone yang dibuat darinya juga akan rusak. Sangat baik untuk lab sementara, sangat buruk untuk server produksi).

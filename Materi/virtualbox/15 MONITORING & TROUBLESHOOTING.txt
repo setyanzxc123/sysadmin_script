@@ -1,0 +1,68 @@
+MATERI 15: MONITORING & TROUBLESHOOTING
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Mempelajari cara memantau penggunaan resource VM dari host.
+- Mengetahui di mana menemukan file log untuk mendiagnosis masalah.
+
+KONSEP INTI
+
+Sama seperti KVM, kemampuan untuk memantau kinerja dan mendiagnosis masalah adalah kunci untuk menjaga lingkungan virtualisasi yang sehat. VirtualBox menyediakan alat baris perintah untuk metrik dan file log yang sangat detail untuk setiap VM.
+
+BAGIAN 1: MONITORING (MEMANTAU KINERJA)
+Alat utama untuk monitoring via CLI adalah 'VBoxManage metrics'. Perintah ini bisa mengambil data real-time dari VM yang sedang berjalan.
+
+LANGKAH-LANGKAH MONITORING
+1. Lihat daftar metrik yang tersedia untuk sebuah VM:
+   `VBoxManage metrics list "Nama VM Anda"`
+
+2. Ambil (query) data dari metrik spesifik:
+   `VBoxManage metrics query "Nama VM Anda" Guest/CPU/Load/User,Guest/RAM/Usage/Total`
+
+   Perintah di atas akan menampilkan penggunaan CPU oleh user dan total penggunaan RAM di dalam guest.
+
+3. Untuk memantau secara terus-menerus, Anda bisa menggabungkannya dengan perintah 'watch':
+   `watch -n 5 VBoxManage metrics query "Nama VM Anda" Guest/CPU/Load/User,Guest/RAM/Usage/Total`
+   Ini akan menjalankan perintah setiap 5 detik.
+
+BAGIAN 2: TROUBLESHOOTING (MENCARI MASALAH)
+Sumber informasi terbaik saat VM gagal start, crash, atau berperilaku aneh adalah file log-nya.
+
+LOKASI FILE LOG
+Setiap VM memiliki file log sendiri yang bernama 'VBox.log'. Lokasinya berada di dalam folder VM tersebut. Biasanya di:
+`~/VirtualBox VMs/Nama VM Anda/Logs/VBox.log`
+
+File ini sangat detail dan mencatat hampir semua hal: dari konfigurasi hardware yang dideteksi, setiap tindakan yang dilakukan user (start, stop, pause), hingga pesan error mendetail jika terjadi kegagalan.
+
+CARA MEMBACA LOG
+Gunakan perintah standar Linux seperti 'cat', 'less', atau 'tail' untuk membacanya.
+
+    # Melihat 100 baris terakhir dari log
+    tail -n 100 "~/VirtualBox VMs/Nama VM Anda/Logs/VBox.log"
+
+    # Mencari kata kunci "error" di dalam log
+    grep -i "error" "~/VirtualBox VMs/Nama VM Anda/Logs/VBox.log"
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: MEMANTAU BEBAN KERJA SECARA REAL-TIME
+- Hipotesis: 'VBoxManage metrics' dapat menunjukkan perubahan beban kerja di dalam guest secara akurat.
+- Langkah:
+  1. Di satu terminal, jalankan perintah 'watch' untuk memantau CPU dan RAM.
+     `watch -n 2 VBoxManage metrics query "Nama VM Anda" Guest/CPU/Load/User,Guest/RAM/Usage/Total`
+  2. Di terminal lain, login ke GUEST VM dan install 'stress-ng': `sudo apt install stress-ng`
+  3. Jalankan beban kerja di GUEST: `stress-ng --cpu 1 --vm 1 --vm-bytes 512M --timeout 60s`
+- Observasi: Amati terminal pertama. Apakah Anda melihat nilai CPU load dan RAM usage melonjak naik saat perintah 'stress-ng' berjalan di guest?
+- Jelaskan: Mengapa monitoring dari level host kadang lebih objektif daripada menjalankan 'top' atau 'htop' di dalam guest? (Jawaban: Alat di dalam guest hanya melihat apa yang "diberikan" oleh hypervisor. Alat di host (seperti 'metrics') melihat apa yang sebenarnya digunakan oleh proses VM dari sumber daya fisik host. Ini bisa membantu mendeteksi masalah seperti "CPU steal time" di mana guest tidak sadar bahwa jatah CPU-nya sedang "dicuri" oleh proses lain di host).
+
+EKSPERIMEN 2: MENCARI INFORMASI DI DALAM LOG
+- Hipotesis: File 'VBox.log' berisi semua detail konfigurasi sesi sebuah VM.
+- Langkah:
+  1. Matikan VM Anda. Hapus log lama jika ada untuk memulai dari awal:
+     `rm "~/VirtualBox VMs/Nama VM Anda/Logs/VBox.log"`
+  2. Nyalakan VM.
+  3. Setelah beberapa saat, buka file 'VBox.log' dengan 'less' atau cari informasi spesifik dengan 'grep'. Coba cari alamat MAC dari kartu jaringan VM Anda.
+     `grep "MAC" "~/VirtualBox VMs/Nama VM Anda/Logs/VBox.log"`
+- Observasi: Apakah Anda berhasil menemukan baris yang mencatat alamat MAC yang dialokasikan untuk NIC 0?
+- Jelaskan: Selain error, untuk tujuan apa lagi file log ini sangat berguna? (Jawaban: Untuk audit. File log mencatat setiap perubahan state (running, paused, saved), setiap perangkat yang terpasang atau dilepas, dan semua konfigurasi sesi. Ini bisa sangat berguna untuk melacak kembali kapan sebuah perubahan dibuat atau apa yang terjadi pada VM di masa lalu).

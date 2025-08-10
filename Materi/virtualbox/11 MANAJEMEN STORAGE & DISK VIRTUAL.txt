@@ -1,0 +1,76 @@
+MATERI 11: MANAJEMEN STORAGE & DISK VIRTUAL
+
+SESI 1 - TUTORIAL & PENJELASAN
+
+TUJUAN UTAMA SESI INI:
+- Memahami cara kerja manajemen disk di VirtualBox.
+- Mampu membuat, memasang (attach), memperbesar (resize), dan melepas (detach) disk virtual menggunakan 'VBoxManage'.
+
+KONSEP INTI
+
+MANAJEMEN DISK DI VIRTUALBOX
+Tidak seperti KVM yang memiliki konsep "Storage Pool", manajemen storage di VirtualBox lebih sederhana. Anda berurusan langsung dengan file-file disk virtual (misalnya, file berekstensi .vdi).
+
+Semua disk yang pernah Anda buat atau gunakan terdaftar di sebuah "Virtual Media Manager" internal. Perintah 'VBoxManage' memungkinkan kita untuk memanipulasi media terdaftar ini.
+
+TUGAS-TUGAS UTAMA
+
+TUGAS 1: MEMBUAT DISK VIRTUAL BARU ('createhd')
+Perintah ini digunakan untuk membuat file hard disk baru.
+
+    VBoxManage createhd --filename "disk-data.vdi" --size 10240 --variant Standard
+
+Penjelasan Opsi:
+- --filename: Nama file disk yang akan dibuat.
+- --size: Ukuran dalam Megabyte (10240 MB = 10 GB).
+- --variant: Tipe alokasi ruang.
+  - Standard: Dynamically allocated (ukuran file tumbuh sesuai pemakaian). Ini adalah default dan paling fleksibel.
+  - Fixed: Fixed size (langsung memakan ruang 10 GB di host). Sedikit lebih cepat tapi boros ruang.
+
+TUGAS 2: MEMASANG (ATTACH) DISK KE VM ('storageattach')
+Setelah disk dibuat, kita perlu memasangnya ke sebuah VM.
+
+    VBoxManage storageattach "Nama VM Anda" --storagectl "SATA Controller" --port 1 --device 0 --type hdd --medium "disk-data.vdi"
+
+PENTING: Perhatikan '--port 1'. Port 0 biasanya digunakan untuk disk utama (OS). Disk tambahan harus dipasang ke port berikutnya yang tersedia (1, 2, 3, dst).
+
+TUGAS 3: MEMPERBESAR (RESIZE) DISK ('modifyhd')
+Anda bisa memperbesar kapasitas disk virtual yang sudah ada.
+
+    VBoxManage modifyhd "disk-data.vdi" --resize 20480
+
+Perintah ini akan mengubah kapasitas disk "disk-data.vdi" menjadi 20 GB (20480 MB).
+CATATAN PENTING: Ini hanya memperbesar "wadah" file disknya. Anda tetap harus memperluas partisi dan filesystem DARI DALAM OS GUEST agar ruang tambahan tersebut bisa digunakan (sama persis seperti di materi KVM).
+
+TUGAS 4: MELEPAS (DETACH) DAN MENGHAPUS DISK
+- Melepas Disk dari VM:
+  `VBoxManage storageattach "Nama VM Anda" --storagectl "SATA Controller" --port 1 --device 0 --type hdd --medium none`
+
+- Menghapus File Disk Sepenuhnya:
+  `VBoxManage closemedium disk "disk-data.vdi" --delete`
+  PERINGATAN: Opsi '--delete' akan menghapus file .vdi secara permanen.
+
+SESI 2 - EKSPERIMEN PEMAHAMAN
+
+EKSPERIMEN 1: DISK DINAMIS VS STATIS
+- Hipotesis: Disk dinamis ('Standard') akan memiliki ukuran file awal yang sangat kecil, sedangkan disk statis ('Fixed') akan langsung berukuran penuh.
+- Langkah:
+  1. Buat disk dinamis 1GB: `VBoxManage createhd --filename dynamic.vdi --size 1024 --variant Standard`
+  2. Buat disk statis 1GB: `VBoxManage createhd --filename fixed.vdi --size 1024 --variant Fixed`
+  3. Cek ukuran kedua file tersebut di host Anda: `ls -lh dynamic.vdi fixed.vdi`
+- Observasi: Berapa ukuran file 'dynamic.vdi' (seharusnya hanya beberapa KB)? Berapa ukuran file 'fixed.vdi' (seharusnya sekitar 1GB)?
+- Jelaskan: Apa keuntungan dan kerugian utama dari disk dinamis? (Jawaban: Keuntungannya adalah hemat ruang di host karena hanya ruang yang terpakai yang dialokasikan. Kerugiannya adalah sedikit overhead performa dan potensi fragmentasi file di host seiring waktu).
+
+EKSPERIMEN 2: ALUR KERJA RESIZE LENGKAP
+- Hipotesis: Memperbesar disk memerlukan tindakan di host dan di guest.
+- Langkah:
+  1. Di HOST, perbesar ukuran disk virtual: `VBoxManage modifyhd "nama-disk.vdi" --resize 15360` (menjadi 15 GB).
+  2. Nyalakan dan login ke GUEST VM.
+  3. Di GUEST, cek ukuran block device: `sudo lsblk`. Anda seharusnya melihat ukuran disk sudah berubah menjadi 15G.
+  4. Di GUEST, cek ukuran filesystem: `df -h`. Ukuran filesystem masih yang lama (misal: 10G).
+  5. Di GUEST, jalankan perintah untuk memperluas partisi dan filesystem:
+     `sudo growpart /dev/sda 1` (asumsi partisi 1 di disk sda)
+     `sudo resize2fs /dev/sda1`
+  6. Di GUEST, cek lagi `df -h`.
+- Observasi: Apakah ukuran filesystem sekarang sudah bertambah menjadi sekitar 15G?
+- Jelaskan: Mengapa proses dua tahap (host lalu guest) ini wajib dilakukan? (Jawaban: Karena host dan guest adalah dua entitas terpisah. Host hanya bisa mengubah spesifikasi "perangkat keras" virtual. Guest, sebagai sistem operasi, harus diberi tahu untuk mengenali dan menggunakan ruang ekstra pada perangkat keras tersebut).
